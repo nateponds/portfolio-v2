@@ -45,32 +45,18 @@ export async function startScene(canvas, signal, overlayCanvas) {
   const travelers=[createBird(),createBird(),createBird(),createBird()];
   const foliage=new THREE.Group();
   foliage.add(branch.root,branch.grove,bird.root,...travelers.map(b=>b.root));
-  let overlay=null,overlayScene=null;
   if(overlayCanvas) {
-    try {
-      overlay=new THREE.WebGLRenderer({canvas:overlayCanvas,antialias:true,alpha:true,powerPreference:'high-performance'});
-      overlay.setClearColor(0,0);
-      overlay.setPixelRatio(pixelRatio);
-      overlay.toneMapping=THREE.ACESFilmicToneMapping;
-      overlay.toneMappingExposure=1;
-      overlayScene=new THREE.Scene();
-      overlayCanvas.hidden=false;
-    } catch {
-      overlay?.dispose();overlay=null;overlayScene=null;
-      overlayCanvas.hidden=true;
-    }
+    overlayCanvas.hidden=true;
   }
   const lights=[hemi,sun,rim];
   const soft=createForeground(renderer,camera,foliage,lights);
-  const foreground=createForeground(overlay||renderer,camera,branch.near,lights);
   const composer=new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene,camera));
-  const blur=new BokehPass(scene,camera,{focus:14.5,aperture:.003,maxblur:.012});
+  const blur=new BokehPass(scene,camera,{focus:14.5,aperture:.00255,maxblur:.0102});
   // Keep the distant sky clear; use the circle of confusion on the near side.
   blur.materialBokeh.fragmentShader=blur.materialBokeh.fragmentShader.replace('float factor = ( focus + viewZ );','float factor = max(0.0, focus + viewZ);');
   composer.addPass(blur);
   composer.addPass(soft.pass);
-  if(!overlay)composer.addPass(foreground.pass);
   composer.addPass(new OutputPass());
   const pointer=new THREE.Vector2(), landingPoint=new THREE.Vector3();
   const perchFacing=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI);
@@ -89,15 +75,13 @@ export async function startScene(canvas, signal, overlayCanvas) {
     width=innerWidth;height=innerHeight;
     camera.aspect=width/height;camera.updateProjectionMatrix();
     halfH=Math.tan(THREE.MathUtils.degToRad(21))*12;halfW=halfH*camera.aspect;
-    renderer.setSize(width,height,false);overlay?.setSize(width,height,false);
-    composer.setSize(width,height);atmosphere.resize(width,height,quality);soft.resize(width,height);foreground.resize(width,height);
+    renderer.setSize(width,height,false);
+    composer.setSize(width,height);atmosphere.resize(width,height,quality);soft.resize(width,height);
     const narrow=width<700;
     branch.root.scale.set(narrow?.9:1.5,narrow?.72:1,1);
     branch.root.position.set(halfW*(narrow?.46:.48)+.93*branch.root.scale.x,-halfH*.62-.69*branch.root.scale.y,0);
     branch.grove.scale.set(narrow?.85:1.35,narrow?.7:.95,1);
     branch.grove.position.set(halfW*(narrow?.18:.22)+.7*branch.grove.scale.x,-halfH*.58-.62*branch.grove.scale.y,0);
-    branch.near.position.set(halfW*(narrow?.02:-.28),-halfH*(narrow?.5:.52),6.2);
-    branch.near.scale.set(narrow?1.25:2.05,narrow?.92:1.65,1);
     const birdScale=2*halfW*(narrow?.17:.095)/1.75;
     bird.root.scale.setScalar(birdScale);
     const moonDepth=47,moonH=Math.tan(THREE.MathUtils.degToRad(21))*moonDepth;
@@ -223,12 +207,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
       b.pose(motionTime*.45+i*1.7,1,0,dt,reduced,{glide,bank:.05*Math.sin(phase*.5),cadence});
     });
     renderer.info.reset();
-    atmosphere.render();soft.render(false);foreground.render(!overlay);composer.render();
-    if(overlay) {
-      overlay.setRenderTarget(null);
-      overlay.autoClear=true;overlay.render(overlayScene,camera);
-      overlay.autoClear=false;foreground.composite(overlay);
-    }
+    atmosphere.render();soft.render(false);composer.render();
     if(canvas.dataset.ready!=='true')last=performance.now();
     canvas.dataset.ready='true';
     // One conservative quality adjustment based on sustained visible frame time.
@@ -238,7 +217,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
         qualityChecked=true;
         if(totalFrameTime/samples>.029){
           quality=.7;renderer.setPixelRatio(Math.min(devicePixelRatio,1));
-          overlay?.setPixelRatio(Math.min(devicePixelRatio,1));resize();
+          resize();
         }
       }
     }
@@ -255,19 +234,17 @@ export async function startScene(canvas, signal, overlayCanvas) {
     window.removeEventListener('resize',resize);window.removeEventListener('pointermove',onPointer);
     document.removeEventListener('pointerleave',resetPointer);document.removeEventListener('visibilitychange',visibility);
     motionPreference.removeEventListener('change',preference);
-    bird.dispose();travelers.forEach(b=>b.dispose());
+    bird.dispose();travelers.forEach(b=>b.dispose());branch.dispose?.();
     const geometries=new Set(),materials=new Set(),textures=new Set();
     scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
-    overlayScene?.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     soft.scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
-    foreground.scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     materials.forEach(material=>{
       for(const value of Object.values(material))if(value?.isTexture)textures.add(value);
       for(const uniform of Object.values(material.uniforms||{}))if(uniform.value?.isTexture)textures.add(uniform.value);
       material.dispose();
     });
     geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());
-    atmosphere.dispose();soft.dispose();foreground.dispose();blur.dispose();composer.dispose();renderer.dispose();overlay?.dispose();
+    atmosphere.dispose();soft.dispose();blur.dispose();composer.dispose();renderer.dispose();
     delete canvas.dataset.ready;
     if(process.env.NODE_ENV === 'development')delete window.__sky;
   };

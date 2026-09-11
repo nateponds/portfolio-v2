@@ -52,7 +52,7 @@ body {
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   font-weight: 400;
   color: rgba(255, 250, 244, 0.92);
-  text-shadow: 0 8px 28px rgba(70, 90, 120, 0.28);
+  text-shadow: 0 8px 24px rgba(70, 90, 120, 0.28);
 }
 
 .intro h1 {

@@ -46,7 +46,7 @@ export function createForeground(renderer, camera, object, lights) {
   return {pass,scene,
     resize(width,height) {
       target.setSize(Math.round(width*.65),Math.round(height*.65));blurred.setSize(target.width,target.height);
-      const radius=width<700?1.2:2.2;
+      const radius=width<700?1.02:1.87;
       horizontal.uniforms.stepSize.value.set(radius/width,0);
       pass.uniforms.stepSize.value.set(0,radius/height);
       overlayMaterial.uniforms.stepSize.value.set(0,radius/height);
