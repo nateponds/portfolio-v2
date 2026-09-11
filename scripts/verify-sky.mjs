@@ -23,10 +23,10 @@ for(const mode of ['day','sunset','night']) {
 }
 await page.goto(`${baseURL}/?sky=day&sceneTime=0`);
 await page.waitForSelector('canvas[data-ready="true"]');
-for(const [time,state] of [[3.49,'waiting'],[3.51,'flying'],[4.8,'flying'],[6,'landing'],[7,'perched'],[40,'perched']]) {
+for(const [time,state] of [[3.49,'waiting'],[3.51,'flying'],[4.8,'flying'],[6.2,'away'],[6.8,'flying'],[8.8,'landing'],[10,'perched'],[40,'perched']]) {
   await page.evaluate(t=>window.__sky.setTime(t),time);
   await page.waitForFunction(expected=>window.__sky.state().bird===expected,state);
-  if(time===6)await page.screenshot({path:'artifacts/sky/landing.png'});
+  if(time===8.8)await page.screenshot({path:'artifacts/sky/landing.png'});
   if(time===4.8)await page.screenshot({path:'artifacts/sky/flight.png'});
 }
 await page.setViewportSize({width:390,height:844});

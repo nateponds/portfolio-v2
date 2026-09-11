@@ -1,7 +1,7 @@
 // Start here to change the homepage text and browser/search metadata.
 export const site = {
   name: 'nateponds',
-  kicker: 'USC CS Student & SysAdmin',
+  kicker: 'University of San Carlos - BSCS Student',
   heading: 'Nathaniel Ryan Ponce',
   role: 'SysAdmin & DevSecOps · Computer Science',
   description:

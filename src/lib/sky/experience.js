@@ -9,7 +9,7 @@ import { loadBirds } from './birds.js';
 import { approximateLocation, skyState } from './daylight.js';
 import { createForeground } from './foreground.js';
 
-export async function startScene(canvas, signal) {
+export async function startScene(canvas, signal, overlayCanvas) {
   // Load before allocating a renderer so an abandoned React mount cannot
   // create a second WebGL context on the same canvas.
   const loader=new THREE.TextureLoader();
@@ -26,8 +26,9 @@ export async function startScene(canvas, signal) {
   const pointerPreference=matchMedia('(hover: hover) and (pointer: fine)');
   const mobile=matchMedia('(max-width: 700px)').matches || !pointerPreference.matches;
   let reduced=motionPreference.matches, disposed=false, hidden=document.hidden;
+  const pixelRatio=Math.min(devicePixelRatio,mobile?1.25:1.6);
   const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1.25:1.6));
+  renderer.setPixelRatio(pixelRatio);
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure=1;
   renderer.info.autoReset=false;
@@ -41,7 +42,25 @@ export async function startScene(canvas, signal) {
   const moon=createMoon(lunarTexture);scene.add(moon);
   const branch=createBranch();scene.add(branch.root);
   const foreground=createForeground(renderer,camera,branch.near,[hemi,sun,rim]);
-  const bird=createBird();scene.add(bird.root);
+  const bird=createBird();
+  let overlay=null,overlayScene=null,overlayLights=[];
+  if(overlayCanvas) {
+    try {
+      overlay=new THREE.WebGLRenderer({canvas:overlayCanvas,antialias:true,alpha:true,powerPreference:'high-performance'});
+      overlay.setClearColor(0,0);
+      overlay.setPixelRatio(pixelRatio);
+      overlay.toneMapping=THREE.ACESFilmicToneMapping;
+      overlay.toneMappingExposure=1;
+      overlayScene=new THREE.Scene();
+      overlayLights=[hemi,sun,rim].map(light=>{const copy=light.clone();overlayScene.add(copy);return copy;});
+      overlayScene.add(bird.root);
+      overlayCanvas.hidden=false;
+    } catch {
+      overlay?.dispose();overlay=null;overlayScene=null;overlayLights=[];
+      overlayCanvas.hidden=true;
+    }
+  }
+  if(!overlayScene)scene.add(bird.root);
   const travelers=[createBird(),createBird()];
   travelers.forEach(b=>scene.add(b.root));
   const composer=new EffectComposer(renderer);
@@ -51,6 +70,10 @@ export async function startScene(canvas, signal) {
   blur.materialBokeh.fragmentShader=blur.materialBokeh.fragmentShader.replace('float factor = ( focus + viewZ );','float factor = max(0.0, focus + viewZ);');
   composer.addPass(blur);composer.addPass(foreground.pass);composer.addPass(new OutputPass());
   const pointer=new THREE.Vector2(), landingPoint=new THREE.Vector3();
+  const perchFacing=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI);
+  const worldQuat=new THREE.Quaternion();
+  const crossStart=3.5,crossDuration=2.6,awayDuration=.55,returnDuration=2.8;
+  const returnStart=crossStart+crossDuration+awayDuration,landedAt=returnStart+returnDuration;
   let width=1,height=1,halfW=1,halfH=1,quality=1,elapsed=0,last=0,frame=0;
   let viewerLocation=null, target=skyState(new Date()), lighting={...target};
   const presets={day:{daylight:1,golden:0},sunset:{daylight:.58,golden:1},night:{daylight:0,golden:0}};
@@ -63,7 +86,8 @@ export async function startScene(canvas, signal) {
     width=innerWidth;height=innerHeight;
     camera.aspect=width/height;camera.updateProjectionMatrix();
     halfH=Math.tan(THREE.MathUtils.degToRad(21))*12;halfW=halfH*camera.aspect;
-    renderer.setSize(width,height,false);composer.setSize(width,height);atmosphere.resize(width,height,quality);foreground.resize(width,height);
+    renderer.setSize(width,height,false);overlay?.setSize(width,height,false);
+    composer.setSize(width,height);atmosphere.resize(width,height,quality);foreground.resize(width,height);
     const narrow=width<700;
     branch.root.scale.set(narrow?.9:1.5,narrow?.72:1,1);
     branch.root.position.set(halfW*(narrow?.46:.48)+.93*branch.root.scale.x,-halfH*.62-.69*branch.root.scale.y,0);
@@ -118,35 +142,48 @@ export async function startScene(canvas, signal) {
     sun.color.set('#fff1d8').lerp(new THREE.Color('#ffb469'),gold);
     hemi.color.set('#829cc9').lerp(new THREE.Color('#e5edff'),day);
     moon.material.uniforms.daylight.value=day;
-    const arrivalStart=3.5, duration=3.2,landedAt=arrivalStart+duration;
     const afterLanding=motionTime-landedAt;
     const impact=!reduced && afterLanding>=0 ? Math.sin(afterLanding*14)*Math.exp(-afterLanding*3)*.009 : 0;
     branch.update(motionTime,impact);
     branch.root.updateMatrixWorld(true);branch.perch.getWorldPosition(landingPoint);
+    const edge=(z,side)=>side*halfW*(camera.position.z-z)/12*1.18;
+    const followPath=(path,progress,brake)=>{
+      const eased=1-(1-progress)**1.65;
+      bird.root.position.copy(path.getPoint(eased));
+      const tangent=path.getTangent(eased);
+      const bank=Math.atan2(tangent.y,Math.hypot(tangent.x,tangent.z)||1);
+      bird.root.rotation.set(0,-Math.atan2(tangent.z,tangent.x),bank*(1-brake)+brake*.16);
+      bird.pose(motionTime,1-THREE.MathUtils.smoothstep(progress,.87,1),brake,dt);
+    };
     if(reduced || t>=landedAt) {
       bird.root.visible=true;
       bird.root.position.copy(landingPoint);
-      bird.root.quaternion.copy(branch.sway.getWorldQuaternion(new THREE.Quaternion()));
-      bird.root.rotation.z+=!reduced && afterLanding<1?-.035*Math.exp(-afterLanding*5):0;
+      bird.root.quaternion.copy(branch.sway.getWorldQuaternion(worldQuat)).multiply(perchFacing);
+      if(!reduced && afterLanding<1)bird.root.rotateZ(-.035*Math.exp(-afterLanding*5));
       bird.pose(motionTime,0,0,dt,reduced);
       bird.root.userData.state='perched';
-    } else if(t<arrivalStart) {
+    } else if(t<crossStart) {
       bird.root.visible=false;bird.root.userData.state='waiting';
+    } else if(t<crossStart+crossDuration) {
+      bird.root.visible=true;
+      followPath(new THREE.CubicBezierCurve3(
+        new THREE.Vector3(edge(3.4,-1),halfH*.1,3.4),
+        new THREE.Vector3(-halfW*.25,halfH*.04,4),
+        new THREE.Vector3(halfW*.25,halfH*.08,3.8),
+        new THREE.Vector3(edge(3.2,1),halfH*.12,3.2),
+      ),(t-crossStart)/crossDuration,0);
+      bird.root.userData.state='flying';
+    } else if(t<returnStart) {
+      bird.root.visible=false;bird.root.userData.state='away';
     } else {
       bird.root.visible=true;
-      const progress=(t-arrivalStart)/duration;
-      const eased=1-(1-progress)**1.65;
-      const path=new THREE.CubicBezierCurve3(
-        new THREE.Vector3(-halfW*1.45,halfH*.18,-5),
-        new THREE.Vector3(-halfW*.6,halfH*.07,-3),
-        landingPoint.clone().add(new THREE.Vector3(-1.2,.85,-.8)),landingPoint,
-      );
-      bird.root.position.copy(path.getPoint(eased));
-      const tangent=path.getTangent(eased);
+      const progress=(t-returnStart)/returnDuration;
       const brake=THREE.MathUtils.smoothstep(progress,.55,.98);
-      bird.root.rotation.set(0,-Math.atan2(tangent.z,tangent.x),Math.atan2(tangent.y,tangent.x)*(1-brake)+brake*.16);
-      const flight=1-THREE.MathUtils.smoothstep(progress,.87,1);
-      bird.pose(motionTime,flight,brake,dt);
+      followPath(new THREE.CubicBezierCurve3(
+        new THREE.Vector3(edge(2.2,1),halfH*.14,2.2),
+        new THREE.Vector3(halfW*.62,halfH*.16,1.2),
+        landingPoint.clone().add(new THREE.Vector3(1.15,.55,.2)),landingPoint,
+      ),progress,brake);
       bird.root.userData.state=progress>.7?'landing':'flying';
     }
     travelers.forEach((b,i)=>{
@@ -159,6 +196,10 @@ export async function startScene(canvas, signal) {
     });
     renderer.info.reset();
     atmosphere.render();foreground.render();composer.render();
+    if(overlay) {
+      overlayLights.forEach((copy,i)=>{const src=[hemi,sun,rim][i];copy.intensity=src.intensity;copy.color.copy(src.color);});
+      overlay.render(overlayScene,camera);
+    }
     if(canvas.dataset.ready!=='true')last=performance.now();
     canvas.dataset.ready='true';
     // One conservative quality adjustment based on sustained visible frame time.
@@ -166,7 +207,10 @@ export async function startScene(canvas, signal) {
       totalFrameTime+=rawDt;samples++;
       if(samples>=90) {
         qualityChecked=true;
-        if(totalFrameTime/samples>.029){quality=.7;renderer.setPixelRatio(Math.min(devicePixelRatio,1));resize();}
+        if(totalFrameTime/samples>.029){
+          quality=.7;renderer.setPixelRatio(Math.min(devicePixelRatio,1));
+          overlay?.setPixelRatio(Math.min(devicePixelRatio,1));resize();
+        }
       }
     }
   }
@@ -185,6 +229,7 @@ export async function startScene(canvas, signal) {
     bird.dispose();travelers.forEach(b=>b.dispose());
     const geometries=new Set(),materials=new Set(),textures=new Set();
     scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
+    overlayScene?.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     foreground.scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     materials.forEach(material=>{
       for(const value of Object.values(material))if(value?.isTexture)textures.add(value);
@@ -192,7 +237,7 @@ export async function startScene(canvas, signal) {
       material.dispose();
     });
     geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());
-    atmosphere.dispose();foreground.dispose();blur.dispose();composer.dispose();renderer.dispose();
+    atmosphere.dispose();foreground.dispose();blur.dispose();composer.dispose();renderer.dispose();overlay?.dispose();
     delete canvas.dataset.ready;
     if(process.env.NODE_ENV === 'development')delete window.__sky;
   };
