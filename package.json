@@ -1,0 +1,27 @@
+{
+  "name": "portfolio-v2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test:sky": "node scripts/verify-sky.mjs",
+    "test:birds": "node scripts/verify-bird-fixes.mjs",
+    "cutouts": "node scripts/make-cutouts.mjs"
+  },
+  "dependencies": {
+    "three": "^0.170.0",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.4",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^16.0.0",
+    "playwright": "^1.58.0"
+  },
+  "engines": { "node": ">=20.9.0" }
+}

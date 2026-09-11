@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+artifacts/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
