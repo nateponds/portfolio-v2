@@ -29,29 +29,55 @@ body {
   text-align: center;
 }
 
-#content h1 {
-  margin: 0;
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2em;
+  padding: 0 20px;
+}
+
+.intro h1,
+.intro p {
+  margin: 20px;
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   font-weight: 400;
-  max-width: 16ch;
-  padding: 0 20px;
-  font-size: clamp(2.4rem, 5.1vw, 5.2rem);
-  line-height: 1.08;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
   color: rgba(255, 250, 244, 0.92);
   text-shadow: 0 8px 28px rgba(70, 90, 120, 0.28);
+}
+
+.intro h1 {
+  white-space: nowrap;
+  font-size: clamp(1.2rem, calc((100vw - 2.5rem) / 11.6), 5.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.intro .kicker {
+  font-size: clamp(0.7rem, 1.1vw, 0.85rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.intro .role {
+  font-size: clamp(0.95rem, 1.6vw, 1.2rem);
+}
+
+.intro .lede {
+  max-width: 68ch;
+  font-size: clamp(0.85rem, 1.3vw, 1rem);
+  line-height: 1.45;
 }
 
 #sky[hidden] { display: none; }
 
 @media (max-width: 700px) {
   #content { padding-bottom: 8svh; }
-  #content h1 { max-width: 12ch; font-size: clamp(2.3rem, 9vw, 3.5rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #content h1 {
+  .intro h1,
+  .intro p {
     text-shadow: none;
   }
 }
