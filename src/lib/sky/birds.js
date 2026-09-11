@@ -73,7 +73,8 @@ export async function loadBirds() {
         // The mixer may skip unchanged tracks: restore its last unmodified pose first.
         controls.forEach(({bone,authored})=>bone.quaternion.copy(authored));
         // Analytic phase with smoothly varying cadence, never a timeScale jump.
-        const phase=time*1.65+.11*Math.sin(time*1.7);
+        const cadence=options.cadence??1.65;
+        const phase=time*cadence+.11*Math.sin(time*(cadence+.05));
         mixer.setTime(still?0:phase);
         controls.forEach(control=>control.authored.copy(control.bone.quaternion));
         // A rig layer over the imported clips: tucked flight legs, reaching feet,

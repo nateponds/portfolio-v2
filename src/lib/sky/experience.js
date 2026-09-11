@@ -42,7 +42,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
   const moon=createMoon(lunarTexture);scene.add(moon);
   const branch=createBranch();
   const bird=createBird();
-  const travelers=[createBird(),createBird()];
+  const travelers=[createBird(),createBird(),createBird(),createBird()];
   const foliage=new THREE.Group();
   foliage.add(branch.root,branch.grove,bird.root,...travelers.map(b=>b.root));
   let overlay=null,overlayScene=null;
@@ -75,7 +75,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
   const pointer=new THREE.Vector2(), landingPoint=new THREE.Vector3();
   const perchFacing=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI);
   const worldQuat=new THREE.Quaternion();
-  const crossStart=3.5,crossDuration=2.6,awayDuration=.55,returnDuration=2.8;
+  const crossStart=3,crossDuration=1.25,awayDuration=3,returnDuration=2.8;
   const returnStart=crossStart+crossDuration+awayDuration,landedAt=returnStart+returnDuration;
   let width=1,height=1,halfW=1,halfH=1,quality=1,elapsed=0,last=0,frame=0;
   let viewerLocation=null, target=skyState(new Date()), lighting={...target};
@@ -103,7 +103,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
     const moonDepth=47,moonH=Math.tan(THREE.MathUtils.degToRad(21))*moonDepth;
     moon.position.set(moonH*camera.aspect*(narrow?.37:.49),moonH*.53,12-moonDepth);
     moon.scale.setScalar(moonH*(narrow?.19:.22));
-    travelers.forEach((b,i)=>b.root.scale.setScalar(.4-i*.12));
+    travelers.forEach((b,i)=>b.root.scale.setScalar(.4-i*.05));
   }
   function onPointer(event) {
     if(!pointerPreference.matches || reduced || event.pointerType==='touch')return;
@@ -160,18 +160,21 @@ export async function startScene(canvas, signal, overlayCanvas) {
       bird.root.position.copy(path.getPointAt(distance));
       const tangent=path.getTangentAt(distance);
       const ahead=path.getTangentAt(Math.min(1,distance+.025));
-      const pitch=THREE.MathUtils.clamp(Math.atan2(tangent.y,Math.hypot(tangent.x,tangent.z)),-.22,.3)*(1-brake)+brake*.28;
+      const flare=returning?THREE.MathUtils.smootherstep(progress,.48,.86):0;
+      const pitch=THREE.MathUtils.clamp(Math.atan2(tangent.y,Math.hypot(tangent.x,tangent.z)),-.22,.32)*(1-flare)
+        +flare*.48*(1-THREE.MathUtils.smootherstep(progress,.9,1));
       const bank=THREE.MathUtils.clamp(tangent.z*ahead.x-tangent.x*ahead.z,-.25,.25)*3;
       bird.root.rotation.set(0,-Math.atan2(tangent.z,tangent.x),0);
-      bird.root.rotateZ(pitch);bird.root.rotateX(bank*(1-brake));
+      bird.root.rotateZ(pitch);bird.root.rotateX(bank*(1-flare));
       if(returning) {
-        const contact=THREE.MathUtils.smootherstep(progress,.45,1);
+        const contact=THREE.MathUtils.smootherstep(progress,.78,1);
         branch.sway.getWorldQuaternion(worldQuat).multiply(perchFacing);
         bird.root.quaternion.slerp(worldQuat,contact);
       }
-      const glide=returning?.6*(1-brake):.65*THREE.MathUtils.smoothstep(Math.sin((t-crossStart)*2.8),.2,.8);
+      const glide=returning?THREE.MathUtils.lerp(.08,.84,flare):0;
+      const cadence=returning?THREE.MathUtils.lerp(2.15,.7,flare):3.45;
       // Keep wings working through contact; fold them during the settle.
-      bird.pose(motionTime,1,brake,dt,false,{glide,bank});
+      bird.pose(motionTime,1,brake,dt,false,{glide,bank,cadence});
     };
     if(reduced || t>=landedAt) {
       bird.root.visible=true;
@@ -186,10 +189,10 @@ export async function startScene(canvas, signal, overlayCanvas) {
     } else if(t<crossStart+crossDuration) {
       bird.root.visible=true;
       followPath(new THREE.CubicBezierCurve3(
-        new THREE.Vector3(edge(3.4,-1),halfH*.34,3.4),
-        new THREE.Vector3(-halfW*.25,halfH*.32,4),
-        new THREE.Vector3(halfW*.25,halfH*.34,3.8),
-        new THREE.Vector3(edge(3.2,1),halfH*.36,3.2),
+        new THREE.Vector3(edge(-5.6,-1),halfH*.52,-5.6),
+        new THREE.Vector3(-halfW*.22,halfH*.5,-6.2),
+        new THREE.Vector3(halfW*.22,halfH*.52,-6),
+        new THREE.Vector3(edge(-5.4,1),halfH*.54,-5.4),
       ),(t-crossStart)/crossDuration,0);
       bird.root.userData.state='flying';
     } else if(t<returnStart) {
@@ -197,26 +200,27 @@ export async function startScene(canvas, signal, overlayCanvas) {
     } else {
       bird.root.visible=true;
       const progress=(t-returnStart)/returnDuration;
-      const brake=THREE.MathUtils.smoothstep(progress,.55,.98);
+      const brake=THREE.MathUtils.smoothstep(progress,.48,.98);
       followPath(new THREE.CubicBezierCurve3(
-        new THREE.Vector3(edge(2.2,1),halfH*.14,2.2),
-        new THREE.Vector3(halfW*.62,halfH*.16,1.2),
-        landingPoint.clone().add(new THREE.Vector3(1.15,.55,.2)),landingPoint,
+        new THREE.Vector3(edge(2.2,1),halfH*.18,2.2),
+        new THREE.Vector3(halfW*.58,halfH*.22,1.15),
+        landingPoint.clone().add(new THREE.Vector3(1.35,.72,.18)),landingPoint,
       ),progress,brake);
       bird.root.userData.state=progress>.7?'landing':'flying';
     }
     travelers.forEach((b,i)=>{
-      const phase=t*.48+i*2.3,speed=.65+i*.18;
-      b.root.position.set(halfW*(.15+i*.65)-t*speed,halfH*(.42+i*.18)+t*.06+.16*Math.sin(phase),-7-i*3+.35*Math.sin(phase*.7));
+      const far=i/3,phase=t*(.28-far*.06)+i*1.85,speed=.58+i*.1;
+      b.root.position.set(halfW*(.22+i*.52)-t*speed,halfH*(.5+i*.08)+t*.025+.1*Math.sin(phase),-5.4-i*2.2+.22*Math.sin(phase*.5));
       const viewHalfWidth=halfW*(camera.position.z-b.root.position.z)/12;
       const exitMargin=Math.max(viewHalfWidth*.12,b.root.scale.x*2);
       b.root.visible=!reduced && b.root.position.x>camera.position.x-viewHalfWidth-exitMargin;
-      const vy=.06+.16*.48*Math.cos(phase),vz=.35*.48*.7*Math.cos(phase*.7);
+      const vy=.03+.1*(.28-far*.06)*Math.cos(phase),vz=.22*(.28-far*.06)*.5*Math.cos(phase*.5);
       b.root.rotation.set(0,-Math.atan2(vz,-speed),0);
       b.root.rotateZ(Math.atan2(vy,Math.hypot(speed,vz)));
-      b.root.rotateX(.07*Math.sin(phase*.7));
-      const glide=.85*THREE.MathUtils.smootherstep(Math.sin(t*1.15+i*2.7),.15,.8);
-      b.pose(motionTime*(1+i*.09)+i*1.37,1,0,dt,reduced,{glide,bank:.07*Math.sin(phase*.7)});
+      b.root.rotateX(.05*Math.sin(phase*.5));
+      const glide=Math.min(.96,.78+.16*far+.06*THREE.MathUtils.smootherstep(Math.sin(t*.7+i*2.1),.2,.85));
+      const cadence=.88-.32*far;
+      b.pose(motionTime*.45+i*1.7,1,0,dt,reduced,{glide,bank:.05*Math.sin(phase*.5),cadence});
     });
     renderer.info.reset();
     atmosphere.render();soft.render(false);foreground.render(!overlay);composer.render();
