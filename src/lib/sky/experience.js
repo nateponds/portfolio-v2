@@ -40,10 +40,12 @@ export async function startScene(canvas, signal, overlayCanvas) {
   const rim=new THREE.DirectionalLight('#bacdff',.5);rim.position.set(5,6,-8);scene.add(rim);
   if(lunarTexture)lunarTexture.colorSpace=THREE.SRGBColorSpace;
   const moon=createMoon(lunarTexture);scene.add(moon);
-  const branch=createBranch();scene.add(branch.root);
-  const foreground=createForeground(renderer,camera,branch.near,[hemi,sun,rim]);
+  const branch=createBranch();
   const bird=createBird();
-  let overlay=null,overlayScene=null,overlayLights=[];
+  const travelers=[createBird(),createBird()];
+  const foliage=new THREE.Group();
+  foliage.add(branch.root,branch.grove,bird.root,...travelers.map(b=>b.root));
+  let overlay=null,overlayScene=null;
   if(overlayCanvas) {
     try {
       overlay=new THREE.WebGLRenderer({canvas:overlayCanvas,antialias:true,alpha:true,powerPreference:'high-performance'});
@@ -52,23 +54,24 @@ export async function startScene(canvas, signal, overlayCanvas) {
       overlay.toneMapping=THREE.ACESFilmicToneMapping;
       overlay.toneMappingExposure=1;
       overlayScene=new THREE.Scene();
-      overlayLights=[hemi,sun,rim].map(light=>{const copy=light.clone();overlayScene.add(copy);return copy;});
-      overlayScene.add(bird.root);
       overlayCanvas.hidden=false;
     } catch {
-      overlay?.dispose();overlay=null;overlayScene=null;overlayLights=[];
+      overlay?.dispose();overlay=null;overlayScene=null;
       overlayCanvas.hidden=true;
     }
   }
-  if(!overlayScene)scene.add(bird.root);
-  const travelers=[createBird(),createBird()];
-  travelers.forEach(b=>scene.add(b.root));
+  const lights=[hemi,sun,rim];
+  const soft=createForeground(renderer,camera,foliage,lights);
+  const foreground=createForeground(overlay||renderer,camera,branch.near,lights);
   const composer=new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene,camera));
-  const blur=new BokehPass(scene,camera,{focus:12.5,aperture:.003,maxblur:.028});
+  const blur=new BokehPass(scene,camera,{focus:14.5,aperture:.003,maxblur:.012});
   // Keep the distant sky clear; use the circle of confusion on the near side.
   blur.materialBokeh.fragmentShader=blur.materialBokeh.fragmentShader.replace('float factor = ( focus + viewZ );','float factor = max(0.0, focus + viewZ);');
-  composer.addPass(blur);composer.addPass(foreground.pass);composer.addPass(new OutputPass());
+  composer.addPass(blur);
+  composer.addPass(soft.pass);
+  if(!overlay)composer.addPass(foreground.pass);
+  composer.addPass(new OutputPass());
   const pointer=new THREE.Vector2(), landingPoint=new THREE.Vector3();
   const perchFacing=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI);
   const worldQuat=new THREE.Quaternion();
@@ -87,12 +90,14 @@ export async function startScene(canvas, signal, overlayCanvas) {
     camera.aspect=width/height;camera.updateProjectionMatrix();
     halfH=Math.tan(THREE.MathUtils.degToRad(21))*12;halfW=halfH*camera.aspect;
     renderer.setSize(width,height,false);overlay?.setSize(width,height,false);
-    composer.setSize(width,height);atmosphere.resize(width,height,quality);foreground.resize(width,height);
+    composer.setSize(width,height);atmosphere.resize(width,height,quality);soft.resize(width,height);foreground.resize(width,height);
     const narrow=width<700;
     branch.root.scale.set(narrow?.9:1.5,narrow?.72:1,1);
     branch.root.position.set(halfW*(narrow?.46:.48)+.93*branch.root.scale.x,-halfH*.62-.69*branch.root.scale.y,0);
-    branch.near.position.set(halfW*(narrow?.55:.35),-halfH*.56,5);
-    branch.near.scale.set(narrow?.7:1.3,narrow?.55:1,1);
+    branch.grove.scale.set(narrow?.85:1.35,narrow?.7:.95,1);
+    branch.grove.position.set(halfW*(narrow?.18:.22)+.7*branch.grove.scale.x,-halfH*.58-.62*branch.grove.scale.y,0);
+    branch.near.position.set(halfW*(narrow?.02:-.28),-halfH*(narrow?.5:.52),6.2);
+    branch.near.scale.set(narrow?1.25:2.05,narrow?.92:1.65,1);
     const birdScale=2*halfW*(narrow?.17:.095)/1.75;
     bird.root.scale.setScalar(birdScale);
     const moonDepth=47,moonH=Math.tan(THREE.MathUtils.degToRad(21))*moonDepth;
@@ -146,31 +151,45 @@ export async function startScene(canvas, signal, overlayCanvas) {
     const impact=!reduced && afterLanding>=0 ? Math.sin(afterLanding*14)*Math.exp(-afterLanding*3)*.009 : 0;
     branch.update(motionTime,impact);
     branch.root.updateMatrixWorld(true);branch.perch.getWorldPosition(landingPoint);
-    const edge=(z,side)=>side*halfW*(camera.position.z-z)/12*1.18;
+    const edge=(z,side)=>side*(halfW*(camera.position.z-z)/12+bird.root.scale.x*2);
     const followPath=(path,progress,brake)=>{
-      const eased=1-(1-progress)**1.65;
-      bird.root.position.copy(path.getPoint(eased));
-      const tangent=path.getTangent(eased);
-      const bank=Math.atan2(tangent.y,Math.hypot(tangent.x,tangent.z)||1);
-      bird.root.rotation.set(0,-Math.atan2(tangent.z,tangent.x),bank*(1-brake)+brake*.16);
-      bird.pose(motionTime,1-THREE.MathUtils.smoothstep(progress,.87,1),brake,dt);
+      const returning=t>=returnStart;
+      // Arc length avoids Bezier control-point spacing changing cruise speed.
+      // Return distance has zero terminal velocity and acceleration.
+      const distance=returning?1.6*progress+.4*progress**3-2.2*progress**4+1.2*progress**5:progress;
+      bird.root.position.copy(path.getPointAt(distance));
+      const tangent=path.getTangentAt(distance);
+      const ahead=path.getTangentAt(Math.min(1,distance+.025));
+      const pitch=THREE.MathUtils.clamp(Math.atan2(tangent.y,Math.hypot(tangent.x,tangent.z)),-.22,.3)*(1-brake)+brake*.28;
+      const bank=THREE.MathUtils.clamp(tangent.z*ahead.x-tangent.x*ahead.z,-.25,.25)*3;
+      bird.root.rotation.set(0,-Math.atan2(tangent.z,tangent.x),0);
+      bird.root.rotateZ(pitch);bird.root.rotateX(bank*(1-brake));
+      if(returning) {
+        const contact=THREE.MathUtils.smootherstep(progress,.45,1);
+        branch.sway.getWorldQuaternion(worldQuat).multiply(perchFacing);
+        bird.root.quaternion.slerp(worldQuat,contact);
+      }
+      const glide=returning?.6*(1-brake):.65*THREE.MathUtils.smoothstep(Math.sin((t-crossStart)*2.8),.2,.8);
+      // Keep wings working through contact; fold them during the settle.
+      bird.pose(motionTime,1,brake,dt,false,{glide,bank});
     };
     if(reduced || t>=landedAt) {
       bird.root.visible=true;
       bird.root.position.copy(landingPoint);
       bird.root.quaternion.copy(branch.sway.getWorldQuaternion(worldQuat)).multiply(perchFacing);
-      if(!reduced && afterLanding<1)bird.root.rotateZ(-.035*Math.exp(-afterLanding*5));
-      bird.pose(motionTime,0,0,dt,reduced);
+      if(!reduced && afterLanding<1)bird.root.rotateZ(-.05*Math.sin(afterLanding*9)*Math.exp(-afterLanding*5));
+      const fold=1-THREE.MathUtils.smootherstep(afterLanding,0,.55);
+      bird.pose(motionTime,reduced?0:fold,1,dt,reduced,{lookTime:Math.max(0,afterLanding-.65)});
       bird.root.userData.state='perched';
     } else if(t<crossStart) {
       bird.root.visible=false;bird.root.userData.state='waiting';
     } else if(t<crossStart+crossDuration) {
       bird.root.visible=true;
       followPath(new THREE.CubicBezierCurve3(
-        new THREE.Vector3(edge(3.4,-1),halfH*.1,3.4),
-        new THREE.Vector3(-halfW*.25,halfH*.04,4),
-        new THREE.Vector3(halfW*.25,halfH*.08,3.8),
-        new THREE.Vector3(edge(3.2,1),halfH*.12,3.2),
+        new THREE.Vector3(edge(3.4,-1),halfH*.34,3.4),
+        new THREE.Vector3(-halfW*.25,halfH*.32,4),
+        new THREE.Vector3(halfW*.25,halfH*.34,3.8),
+        new THREE.Vector3(edge(3.2,1),halfH*.36,3.2),
       ),(t-crossStart)/crossDuration,0);
       bird.root.userData.state='flying';
     } else if(t<returnStart) {
@@ -187,18 +206,24 @@ export async function startScene(canvas, signal, overlayCanvas) {
       bird.root.userData.state=progress>.7?'landing':'flying';
     }
     travelers.forEach((b,i)=>{
-      b.root.position.set(halfW*(.15+i*.65)-t*(.55+i*.15),halfH*(.42+i*.18)+t*.075,-7-i*3);
+      const phase=t*.48+i*2.3,speed=.65+i*.18;
+      b.root.position.set(halfW*(.15+i*.65)-t*speed,halfH*(.42+i*.18)+t*.06+.16*Math.sin(phase),-7-i*3+.35*Math.sin(phase*.7));
       const viewHalfWidth=halfW*(camera.position.z-b.root.position.z)/12;
       const exitMargin=Math.max(viewHalfWidth*.12,b.root.scale.x*2);
       b.root.visible=!reduced && b.root.position.x>camera.position.x-viewHalfWidth-exitMargin;
-      b.root.rotation.set(.1,Math.PI-.15,-.06);
-      b.pose(motionTime+i*.9,1,0,dt,reduced);
+      const vy=.06+.16*.48*Math.cos(phase),vz=.35*.48*.7*Math.cos(phase*.7);
+      b.root.rotation.set(0,-Math.atan2(vz,-speed),0);
+      b.root.rotateZ(Math.atan2(vy,Math.hypot(speed,vz)));
+      b.root.rotateX(.07*Math.sin(phase*.7));
+      const glide=.85*THREE.MathUtils.smootherstep(Math.sin(t*1.15+i*2.7),.15,.8);
+      b.pose(motionTime*(1+i*.09)+i*1.37,1,0,dt,reduced,{glide,bank:.07*Math.sin(phase*.7)});
     });
     renderer.info.reset();
-    atmosphere.render();foreground.render();composer.render();
+    atmosphere.render();soft.render(false);foreground.render(!overlay);composer.render();
     if(overlay) {
-      overlayLights.forEach((copy,i)=>{const src=[hemi,sun,rim][i];copy.intensity=src.intensity;copy.color.copy(src.color);});
-      overlay.render(overlayScene,camera);
+      overlay.setRenderTarget(null);
+      overlay.autoClear=true;overlay.render(overlayScene,camera);
+      overlay.autoClear=false;foreground.composite(overlay);
     }
     if(canvas.dataset.ready!=='true')last=performance.now();
     canvas.dataset.ready='true';
@@ -230,6 +255,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
     const geometries=new Set(),materials=new Set(),textures=new Set();
     scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     overlayScene?.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
+    soft.scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     foreground.scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     materials.forEach(material=>{
       for(const value of Object.values(material))if(value?.isTexture)textures.add(value);
@@ -237,7 +263,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
       material.dispose();
     });
     geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());
-    atmosphere.dispose();foreground.dispose();blur.dispose();composer.dispose();renderer.dispose();overlay?.dispose();
+    atmosphere.dispose();soft.dispose();foreground.dispose();blur.dispose();composer.dispose();renderer.dispose();overlay?.dispose();
     delete canvas.dataset.ready;
     if(process.env.NODE_ENV === 'development')delete window.__sky;
   };

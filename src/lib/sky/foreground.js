@@ -33,6 +33,15 @@ export function createForeground(renderer, camera, object, lights) {
       gl_FragColor=vec4(near.rgb+base*(1.-near.a),1.);}`,
   });
   pass.uniforms.layer.value=blurred.texture;
+  const overlayMaterial=new THREE.ShaderMaterial({
+    uniforms:{layer:{value:blurred.texture},stepSize:{value:new THREE.Vector2()}},vertexShader,
+    fragmentShader:`uniform sampler2D layer; uniform vec2 stepSize; varying vec2 vUv; ${gaussian}
+      void main(){gl_FragColor=softLayer(layer,vUv,stepSize);}`,
+    transparent:true,depthTest:false,depthWrite:false,
+    blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha:THREE.OneFactor,blendDstAlpha:THREE.OneMinusSrcAlphaFactor,
+  });
+  const overlayQuad=new FullScreenQuad(overlayMaterial);
   const clear=new THREE.Color();
   return {pass,scene,
     resize(width,height) {
@@ -40,14 +49,19 @@ export function createForeground(renderer, camera, object, lights) {
       const radius=width<700?1.2:2.2;
       horizontal.uniforms.stepSize.value.set(radius/width,0);
       pass.uniforms.stepSize.value.set(0,radius/height);
+      overlayMaterial.uniforms.stepSize.value.set(0,radius/height);
     },
-    render() {
-      copies.forEach((copy,i)=>{copy.intensity=lights[i].intensity;copy.color.copy(lights[i].color);});
+    render(present=true) {
+      copies.forEach((copy,i)=>{copy.intensity=Math.max(lights[i].intensity,1.6);copy.color.copy(lights[i].color);});
       renderer.getClearColor(clear);const alpha=renderer.getClearAlpha();
       renderer.setClearColor(0,0);renderer.setRenderTarget(target);renderer.clear();renderer.render(scene,camera);
       renderer.setRenderTarget(blurred);renderer.clear();quad.render(renderer);
-      renderer.setRenderTarget(null);renderer.setClearColor(clear,alpha);
+      renderer.setRenderTarget(present?null:blurred);renderer.setClearColor(clear,alpha);
     },
-    dispose(){target.dispose();blurred.dispose();horizontal.dispose();quad.dispose();pass.dispose();},
+    composite(dest) {
+      dest.setRenderTarget(null);
+      overlayQuad.render(dest);
+    },
+    dispose(){target.dispose();blurred.dispose();horizontal.dispose();quad.dispose();pass.dispose();overlayMaterial.dispose();overlayQuad.dispose();},
   };
 }

@@ -1,15 +1,19 @@
 # Sky page
 
-The approved direction is Fable blue daylight, a brief peach sunset, and deep blue Fable nighttime. Four large volumetric cloud banks frame the corners, with smaller clouds along the sides. The nearby branches reach left, sway and receive depth-of-field blur. One imported rigged bird enters after 3.5 visible seconds, brakes and lands over 3.2 seconds, then remains perched. Head turns use irregular pauses alongside the authored idle animation. Other birds depart without wrapping. Hidden tabs pause the animation; returning does not replay the entrance.
+The approved direction is Fable blue daylight, a brief peach sunset, and deep blue Fable nighttime. Four large volumetric cloud banks frame the corners, with smaller clouds along the sides. The nearby branches reach left, sway and receive a Gaussian bloom that spreads past their silhouettes. Perch trees, the hero bird and background travelers use the same bloom pass. One imported rigged bird enters after 3.5 visible seconds, brakes and lands over 3.2 seconds, then remains perched. Head turns use irregular pauses alongside the authored idle animation. Other birds depart without wrapping. Hidden tabs pause the animation; returning does not replay the entrance.
 
 ## Implementation
+
+The runtime rig adds bounded leg tuck, an authored standing-leg reach on approach, toe curl, tail trim and coordinated neck/head offsets. All controlled bones restore their last authored mixer pose before applying offsets, including repeated preview frames. Landing holds the standing leg rotations while wing actions finish folding. The overlay renderer composites only the closest left-side branches above page copy. Birds and perch trees bloom in the main composer so softness spreads past their outlines. Feather materials retain the original texture with a restrained cool tint and matte response. The GLB mesh, skin weights and 55-bone hierarchy remain unchanged.
+
+Bird motion uses arc-length cruise travel, progressive return braking, tangent-based heading/pitch and restrained banking. The existing Flap and Glide clips blend through flight; wings fold over 0.55 seconds after foot contact. Airborne anchoring is fixed relative to the body and blends into the animated foot midpoint on approach. Background birds have independent flap phases, glide bouts and shallow curved paths. Perched head observations use quick eased turns, irregular holds and occasional tilts, evaluated from absolute time for repeatable previews without accumulated bone offsets. The hero starts crossing at 3.5 seconds, returns at 6.65 seconds and touches down at 9.45 seconds.
 
 - `src/lib/sky/atmosphere.js`: ray-marched 3D cloud density, directional self-shading, sky palettes and nighttime stars. Lower-resolution offscreen rendering and one adaptive quality adjustment limit GPU cost.
 - `src/lib/sky/nature.js`: tapered branch meshes and textured lunar sphere with soft atmospheric edges.
 - `src/lib/sky/birds.js`: imported Mesh2Motion CC0 bird, cloned skeletons, authored flight/idle blending, head looks and foot anchoring. No custom bird geometry remains.
 - `src/lib/sky/daylight.js`: solar altitude from date and approximate coordinates. Sunset warmth peaks around the solar center reaching -0.833 degrees and fades within about twelve minutes on each side. Polar day and night use actual solar altitude.
-- `src/lib/sky/experience.js`: perspective composition, near-field bokeh, lighting, animation and resource cleanup. Mobile has a larger relative bird and no pointer parallax. Reduced motion shows a still perched bird and still clouds/branches.
-- `src/lib/sky/foreground.js`: separate closest-branch rendering and two-pass Gaussian blur, composited with the main scene so softness extends beyond the twig silhouettes.
+- `src/lib/sky/experience.js`: perspective composition, lighting, animation and resource cleanup. Distant sky still uses a one-sided bokeh pass; trees and birds use the Gaussian bloom layer. Mobile has a larger relative bird and no pointer parallax. Reduced motion shows a still perched bird and still clouds/branches.
+- `src/lib/sky/foreground.js`: offscreen rendering plus two-pass Gaussian blur so softness extends beyond silhouettes. Closest left branches composite onto the overlay canvas (in front of page copy). Perch trees and all birds use the same bloom into the main composer. Falls back into the main composer if the overlay renderer is unavailable.
 
 ## Location
 

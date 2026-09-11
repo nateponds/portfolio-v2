@@ -45,22 +45,9 @@ function taperedBranch(points,radius,material) {
   return new THREE.Mesh(geometry,material);
 }
 
-export function createBranch() {
-  const root=new THREE.Group(), sway=new THREE.Group();root.add(sway);
-  const barkTexture=surface('bark');
-  barkTexture.repeat.set(2,5);
-  const bark=new THREE.MeshStandardMaterial({color:'#746957',map:barkTexture,bumpMap:barkTexture,bumpScale:.035,roughness:1});
-  const bud=new THREE.MeshStandardMaterial({color:'#656044',roughness:1});
-  sway.add(taperedBranch([[3,-2.6,1.6],[1.6,-.9,.6],[.5,.23,.1],[-.8,.62,0],[-2.6,.97,-.3]],.135,bark));
-  const twigs=[];
-  for(const spec of [
-    [[1.3,-.6,.5],[1.55,.5,.7],[1.28,1.7,.85],[1.55,2.1,.8]],
-    [[.3,.3,.1],[-.05,1.13,.05],[-.48,1.83,-.2],[-.25,2.18,-.2]],
-    [[-.85,.65,0],[-1.7,.1,.3],[-2.55,.22,.3]],
-    [[2,-1.4,1.],[.3,-1.1,2.2],[-1.2,-.42,3.3],[-2.1,.2,3.8]],
-    [[2,-1.3,1.],[2.9,.0,2.7],[3.2,1.7,3.5]],
-  ]) {
-    const pivot=new THREE.Group();pivot.position.set(...spec[0]);sway.add(pivot);
+function addTwigs(parent,specs,bark,bud,twigs) {
+  for(const spec of specs) {
+    const pivot=new THREE.Group();pivot.position.set(...spec[0]);parent.add(pivot);
     const local=spec.map(p=>p.map((v,i)=>v-spec[0][i]));
     pivot.add(taperedBranch(local,.042,bark)); twigs.push(pivot);
     for(let i=1;i<local.length;i++) {
@@ -69,15 +56,46 @@ export function createBranch() {
       ellipsoid(pivot,bud,[p[0]-.38,p[1]+.41,p[2]+.05],[.031,.071,.029]).rotation.z=-.4;
     }
   }
+}
+
+export function createBranch() {
+  const root=new THREE.Group(), sway=new THREE.Group();root.add(sway);
+  const grove=new THREE.Group(), groveSway=new THREE.Group();grove.add(groveSway);
+  const barkTexture=surface('bark');
+  barkTexture.repeat.set(2,5);
+  const bark=new THREE.MeshStandardMaterial({color:'#746957',map:barkTexture,bumpMap:barkTexture,bumpScale:.035,roughness:1});
+  const bud=new THREE.MeshStandardMaterial({color:'#656044',roughness:1});
+  sway.add(taperedBranch([[3,-2.6,1.6],[1.6,-.9,.6],[.5,.23,.1],[-.8,.62,0],[-2.6,.97,-.3]],.135,bark));
+  const twigs=[];
+  addTwigs(sway,[
+    [[1.3,-.6,.5],[1.55,.5,.7],[1.28,1.7,.85],[1.55,2.1,.8]],
+    [[.3,.3,.1],[-.05,1.13,.05],[-.48,1.83,-.2],[-.25,2.18,-.2]],
+    [[-.85,.65,0],[-1.7,.1,.3],[-2.55,.22,.3]],
+    [[2,-1.4,1.],[.3,-1.1,2.2],[-1.2,-.42,3.3],[-2.1,.2,3.8]],
+    [[2,-1.3,1.],[2.9,.0,2.7],[3.2,1.7,3.5]],
+    [[1.1,-1.1,.8],[-.4,-.55,1.4],[-1.8,.05,1.9],[-3.1,.35,2.1]],
+    [[.6,-.2,.2],[-.9,.15,.55],[-2.2,.55,.7],[-3.4,.85,.5]],
+    [[1.8,-1.8,1.2],[.2,-1.55,2.4],[-1.6,-.9,3.1],[-2.8,-.2,3.4]],
+  ],bark,bud,twigs);
+  groveSway.add(taperedBranch([[2.4,-2.8,1.2],[1.1,-1.1,.5],[-.4,.15,.15],[-2.2,.7,-.15],[-3.6,1.15,-.35]],.12,bark));
+  addTwigs(groveSway,[
+    [[1.6,-1.2,.6],[.2,-.4,1.1],[-1.5,.2,1.5],[-2.8,.65,1.6]],
+    [[.4,-.2,.2],[-.8,.45,.4],[-2.1,.9,.35],[-3.3,1.25,.2]],
+    [[-.6,.35,.1],[-1.8,.15,.55],[-3.1,.45,.7]],
+    [[1.2,-1.7,.9],[-.3,-1.2,2.],[-1.9,-.5,2.7],[-3.,.15,2.9]],
+    [[.1,.2,.05],[-1.1,.7,.15],[-2.4,1.15,0],[-3.5,1.5,-.15]],
+  ],bark,bud,twigs);
   const near=new THREE.Group();
   near.add(taperedBranch([[1.5,-1.8,0],[.3,-.3,.4],[-.7,.7,.7],[-.9,1.9,1.1]],.12,bark));
   near.add(taperedBranch([[.3,-.3,.4],[.45,.7,.9],[.1,1.5,1.3]],.075,bark));
   near.add(taperedBranch([[-.7,.7,.7],[-1.5,1.1,1.2],[-1.9,1.8,1.5]],.045,bark));
   const perch=new THREE.Object3D();perch.position.set(-.93,.69,0);sway.add(perch);
-  return {root,sway,perch,near,
+  return {root,sway,grove,perch,near,
     update(time,impact=0) {
       sway.rotation.z=Math.sin(time*.67)*.012+Math.sin(time*1.13+.7)*.006+impact;
       sway.rotation.y=Math.sin(time*.41)*.013;
+      groveSway.rotation.z=Math.sin(time*.61+.4)*.014+Math.sin(time*1.05)*.006;
+      groveSway.rotation.y=Math.sin(time*.37+.9)*.012;
       near.rotation.z=Math.sin(time*.56+.8)*.032;
       near.rotation.y=Math.sin(time*.77)*.022;
       twigs.forEach((twig,i)=>{twig.rotation.z=Math.sin(time*(.85+i*.12)+i)*.018;});

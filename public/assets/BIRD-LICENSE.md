@@ -9,5 +9,6 @@ https://creativecommons.org/publicdomain/zero/1.0/
 
 Downloaded 2026-09-11. Original asset retained unchanged. Includes a skinned bird,
 55 joints and Flap, Glide, Idle, Rest Pose and Walk animations.
-Runtime changes: orientation/scale, animation blending, foot anchoring and head-look offsets.
+Runtime changes: orientation/scale, animation blending, foot anchoring, leg tuck/reach,
+toe curl, tail and neck/head offsets, and matte feather material tuning.
 Free for personal/commercial use, modification and redistribution; no attribution required.
