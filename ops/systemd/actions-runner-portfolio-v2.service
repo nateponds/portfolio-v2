@@ -1,0 +1,14 @@
+[Unit]
+Description=GitHub Actions Runner (portfolio-v2)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/nateponds/actions-runner-portfolio-v2
+ExecStart=/home/nateponds/actions-runner-portfolio-v2/runsvc.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

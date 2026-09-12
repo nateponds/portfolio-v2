@@ -1,0 +1,19 @@
+[Unit]
+Description=Nateponds Portfolio V2
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/Storage2_New/website-hosting/portfolio-v2/current
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3010
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target

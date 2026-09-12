@@ -1,0 +1,74 @@
+name: Cut over nateponds.com to V2
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-v2-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cutover:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, portfolio-v2]
+    environment: production
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify staged V2 service
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error http://127.0.0.1:3010/api/health \
+            | grep -Fqx '{"ok":true}'
+          curl --fail --silent --show-error http://127.0.0.1:3010/ >/dev/null
+
+      - name: Install Apache candidate and cut over
+        run: |
+          set -euo pipefail
+          candidate=/mnt/Storage2_New/website-hosting/nateponds-portfolio/ops/apache/nateponds-portfolio.conf
+          install -m 0644 ops/apache/nateponds-portfolio.conf "${candidate}"
+          sudo /usr/local/sbin/deploy-nateponds-apache
+
+      - name: Verify Apache origin
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            -H 'Host: nateponds.com' -H 'X-Forwarded-Proto: https' \
+            http://127.0.0.1:8082/api/health | grep -Fqx '{"ok":true}'
+          headers="$(curl --fail --silent --show-error --dump-header - --output /dev/null \
+            -H 'Host: nateponds.com' -H 'X-Forwarded-Proto: https' \
+            http://127.0.0.1:8082/ | tr -d '\r')"
+          grep -Eqi '^HTTP/[0-9.]+ 200 ' <<<"${headers}"
+          grep -Eqi '^content-security-policy:' <<<"${headers}"
+          grep -Eqi '^strict-transport-security: max-age=31536000$' <<<"${headers}"
+          ! grep -Eqi '^x-powered-by:' <<<"${headers}"
+
+      - name: Purge Cloudflare cache when credentials are configured
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLOUDFLARE_ZONE_ID}" || -z "${CLOUDFLARE_API_TOKEN}" ]]; then
+            echo 'Cloudflare secrets are not configured; skipping cache purge.'
+            exit 0
+          fi
+          response="$(curl --fail --silent --show-error \
+            -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data '{"purge_everything":true}')"
+          grep -Eq '"success"[[:space:]]*:[[:space:]]*true' <<<"${response}"
+
+      - name: Verify public site
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 2 \
+            https://nateponds.com/api/health | grep -Fqx '{"ok":true}'
+          curl --fail --silent --show-error https://nateponds.com/ >/dev/null

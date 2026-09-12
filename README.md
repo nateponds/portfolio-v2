@@ -95,6 +95,11 @@ Browser checks require the development server in another terminal. Install Chrom
 
 Set `BASE_URL` to test another development port. Set `BROWSER_CHANNEL=msedge` to use installed Microsoft Edge instead of Playwright Chromium. In PowerShell: `$env:BROWSER_CHANNEL = 'msedge'`.
 
-For production, run `npm run lint`, `npm run build`, then `npm start`. Deploy with a host that supports Next.js or a Node.js server. `.next/` is generated output; the old Vite `dist/` directory is no longer used. Commit source and `package-lock.json`, not generated output or `node_modules`.
+For production, run `npm run lint`, `npm run build`, then `npm start`. The build
+also produces a standalone Node.js server for `nathanlab`. Its GitHub Actions,
+atomic releases, manual Apache cutover, and rollback procedures are documented
+in [ops/README.md](ops/README.md). `.next/` is generated output; the old Vite
+`dist/` directory is no longer used. Commit source and `package-lock.json`, not
+generated output or `node_modules`.
 
 Framework reference: [Next.js App Router documentation](https://nextjs.org/docs/app).

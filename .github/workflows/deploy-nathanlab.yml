@@ -1,0 +1,72 @@
+name: Deploy V2 to nathanlab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-v2-nathanlab
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, x64, portfolio-v2]
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build standalone server
+        env:
+          DEPLOYMENT_VERSION: ${{ github.sha }}
+        run: npm run build
+
+      - name: Assemble standalone release
+        run: |
+          set -euo pipefail
+          test -f .next/standalone/server.js
+          install -d .next/standalone/public .next/standalone/.next/static
+          rsync -a --delete public/ .next/standalone/public/
+          rsync -a --delete .next/static/ .next/standalone/.next/static/
+
+      - name: Smoke test release
+        run: |
+          set -euo pipefail
+          cd .next/standalone
+          HOSTNAME=127.0.0.1 PORT=3110 node server.js >"${RUNNER_TEMP}/portfolio-v2-smoke.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:3110/api/health | grep -Fqx '{"ok":true}'
+          curl --fail --silent --show-error http://127.0.0.1:3110/ >/dev/null
+
+      - name: Activate release
+        env:
+          DEPLOYMENT_VERSION: ${{ github.sha }}
+          RELEASE_RUN_ID: ${{ github.run_id }}
+          RELEASE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: ops/bin/deploy-nathanlab
+
+      - name: Verify staged service
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:3010/api/health | grep -Fqx '{"ok":true}'
+          curl --fail --silent --show-error http://127.0.0.1:3010/ >/dev/null

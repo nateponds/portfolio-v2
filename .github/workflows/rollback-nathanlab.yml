@@ -1,0 +1,46 @@
+name: Roll back nateponds.com on nathanlab
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Roll back the V2 release or restore the legacy Apache site
+        required: true
+        default: previous-v2-release
+        type: choice
+        options:
+          - previous-v2-release
+          - legacy-site
+
+concurrency:
+  group: portfolio-v2-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, portfolio-v2]
+    environment: production
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore previous V2 release
+        if: inputs.target == 'previous-v2-release'
+        run: ops/bin/rollback-nathanlab
+
+      - name: Restore legacy Apache site
+        if: inputs.target == 'legacy-site'
+        run: sudo /usr/local/sbin/rollback-nateponds-apache
+
+      - name: Verify origin
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            -H 'Host: nateponds.com' -H 'X-Forwarded-Proto: https' \
+            http://127.0.0.1:8082/ >/dev/null

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[[ $# -eq 0 ]] || {
+  echo 'rollback-nathanlab accepts no arguments' >&2
+  exit 64
+}
+
+readonly deploy_root='/mnt/Storage2_New/website-hosting/portfolio-v2'
+readonly current_link="${deploy_root}/current"
+readonly previous_link="${deploy_root}/previous"
+
+[[ -L "${current_link}" && -L "${previous_link}" ]] || {
+  echo 'Both current and previous release links are required' >&2
+  exit 66
+}
+
+current_release="$(readlink -f "${current_link}")"
+previous_release="$(readlink -f "${previous_link}")"
+[[ -d "${current_release}" && -d "${previous_release}" ]] || {
+  echo 'A release link does not point to a directory' >&2
+  exit 66
+}
+
+restore_links_on_failure() {
+  local exit_code="${1:-1}"
+  trap - ERR INT TERM HUP
+  set +e
+  ln -sfn "${current_release}" "${deploy_root}/current.restore"
+  ln -sfn "${previous_release}" "${deploy_root}/previous.restore"
+  mv -Tf "${deploy_root}/current.restore" "${current_link}"
+  mv -Tf "${deploy_root}/previous.restore" "${previous_link}"
+  systemctl --user restart portfolio-v2.service
+  exit "${exit_code}"
+}
+trap 'restore_links_on_failure $?' ERR
+trap 'restore_links_on_failure 130' INT TERM HUP
+
+ln -sfn "${previous_release}" "${deploy_root}/current.rollback"
+ln -sfn "${current_release}" "${deploy_root}/previous.rollback"
+mv -Tf "${deploy_root}/current.rollback" "${current_link}"
+mv -Tf "${deploy_root}/previous.rollback" "${previous_link}"
+systemctl --user restart portfolio-v2.service
+
+for attempt in {1..15}; do
+  if curl --fail --silent --show-error http://127.0.0.1:3010/api/health \
+    | grep -Fqx '{"ok":true}'; then
+    trap - ERR INT TERM HUP
+    echo "Activated previous release: ${previous_release}"
+    exit 0
+  fi
+  sleep 1
+done
+
+echo 'Previous release did not become healthy' >&2
+restore_links_on_failure 1
