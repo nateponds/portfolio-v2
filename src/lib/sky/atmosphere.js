@@ -23,6 +23,10 @@ export function createAtmosphere(renderer, mobile) {
   const uniforms = {
     noiseMap: { value: noise }, time: { value: 0 }, aspect: { value: 1 },
     daylight: { value: 1 }, golden: { value: 0 },
+    // The page is a vertical slice through one continuous atmosphere. The
+    // renderer stays viewport-sized; this offset moves the ray origin through
+    // a larger world as the document scrolls.
+    scrollOffset: { value: 0 }, scrollProgress: { value: 0 },
     cameraOffset: { value: new THREE.Vector2() },
     resolution: { value: new THREE.Vector2(1, 1) },
   };
@@ -33,7 +37,7 @@ export function createAtmosphere(renderer, mobile) {
     fragmentShader: `
       precision highp sampler3D;
       uniform sampler3D noiseMap;
-      uniform float time, aspect, daylight, golden;
+      uniform float time, aspect, daylight, golden, scrollOffset, scrollProgress;
       uniform vec2 cameraOffset, resolution;
       in vec2 uvScreen;
       out vec4 fragColor;
@@ -43,6 +47,8 @@ export function createAtmosphere(renderer, mobile) {
       float density(vec3 p) {
         float halfW = 14.6 * aspect;
         float shape = -10.;
+        // Near banks form the opening composition; the additional banks are
+        // deliberately distributed along y so descent reveals fresh clouds.
         shape = max(shape, 1.-length((p-vec3(-halfW*.98,12.7,-38.))/vec3(halfW*.49,7.0,7.8)));
         shape = max(shape, 1.-length((p-vec3(halfW*1.08,13.8,-41.))/vec3(halfW*.48,7.8,8.5)));
         shape = max(shape, 1.-length((p-vec3(-halfW*.89,-13.3,-35.))/vec3(halfW*.64,6.2,8.)));
@@ -50,6 +56,10 @@ export function createAtmosphere(renderer, mobile) {
         // Smaller, shallower side banks preserve the open title area.
         shape = max(shape, .80-length((p-vec3(-halfW*1.03,1.9,-37.))/vec3(halfW*.31,5.4,4.6)));
         shape = max(shape, .76-length((p-vec3(halfW*1.04,-.5,-38.))/vec3(halfW*.30,5.9,4.8)));
+        shape = max(shape, .66-length((p-vec3(-halfW*.92,28.3,-43.))/vec3(halfW*.58,6.1,8.8)));
+        shape = max(shape, .58-length((p-vec3(halfW*.94,34.8,-46.))/vec3(halfW*.47,7.2,8.2)));
+        shape = max(shape, .54-length((p-vec3(-halfW*.82,49.5,-50.))/vec3(halfW*.52,8.4,9.4)));
+        shape = max(shape, .46-length((p-vec3(halfW*.9,57.5,-52.))/vec3(halfW*.42,7.4,8.8)));
         if(shape < -.45) return 0.;
         vec3 wind = vec3(time*.055,0.,time*.018);
         float billow = fbm(p*.48+wind);
@@ -58,7 +68,15 @@ export function createAtmosphere(renderer, mobile) {
       }
       void main() {
         vec2 uv = uvScreen;
-        vec3 sky = mix(mix(vec3(.024,.037,.082),vec3(.004,.008,.023),uv.y),mix(vec3(.29,.38,.57),vec3(.14,.22,.43),uv.y),daylight);
+        vec3 dayHorizon = vec3(.78,.88,.89);
+        vec3 dayZenith = vec3(.38,.65,.73);
+        vec3 nightHorizon = vec3(.16,.24,.31);
+        vec3 nightZenith = vec3(.025,.06,.10);
+        vec3 sky = mix(mix(nightHorizon,nightZenith,uv.y),mix(dayHorizon,dayZenith,uv.y),daylight);
+        // Lower sections become open mist rather than a new background card.
+        float descent = smoothstep(.08,.78,scrollProgress);
+        vec3 mist = mix(vec3(.66,.79,.83),vec3(.84,.90,.90),uv.y);
+        sky = mix(sky,mist,descent*.32);
         vec3 sunset = mix(vec3(.49,.20,.14),vec3(.15,.23,.32),smoothstep(0.,.9,uv.y));
         sky = mix(sky,sunset,golden*.76);
         vec2 starGrid = floor(uv*vec2(aspect,1.)*470.);
@@ -66,7 +84,7 @@ export function createAtmosphere(renderer, mobile) {
         float stars = step(.9975,hash(starGrid))*exp(-dot(starUV,starUV)*85.);
         sky += stars*pow(1.-daylight,4.)*.55*(.85+.15*sin(time*.3+hash(starGrid)*50.));
         vec3 ray = normalize(vec3((uv-.5)*vec2(aspect,1.)*.7673,-1.));
-        vec3 origin = vec3(cameraOffset,0.);
+        vec3 origin = vec3(cameraOffset.x,cameraOffset.y + scrollOffset,0.);
         vec3 color = vec3(0.);
         float transmittance = 1.;
         float jitter = hash(floor(uv*resolution));
@@ -79,8 +97,8 @@ export function createAtmosphere(renderer, mobile) {
           if(d>.005) {
             float shade = density(p+lightDir*1.3)*.85+density(p+lightDir*3.)*.5;
             float lighting = exp(-shade*2.5);
-            vec3 shadowColor = mix(vec3(.045,.066,.12),vec3(.38,.46,.61),daylight);
-            vec3 litColor = mix(vec3(.17,.22,.34),vec3(.96,.90,.77),daylight);
+            vec3 shadowColor = mix(vec3(.075,.12,.16),vec3(.42,.54,.59),daylight);
+            vec3 litColor = mix(vec3(.22,.30,.36),vec3(.97,.95,.88),daylight);
             litColor = mix(litColor,vec3(1.,.47,.20),golden*.95);
             shadowColor = mix(shadowColor,vec3(.46,.32,.35),golden*.65);
             vec3 cloud = mix(shadowColor,litColor,lighting);

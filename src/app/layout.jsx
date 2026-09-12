@@ -2,7 +2,7 @@ import { site } from '@/content/site';
 import './globals.css';
 
 export const metadata = {
-  title: { default: site.name, template: `%s | ${site.name}` },
+  title: { default: site.title, template: `%s | ${site.name}` },
   description: site.description,
 };
 

@@ -68,12 +68,31 @@ export async function startScene(canvas, signal, overlayCanvas) {
   const crossStart=3,crossDuration=1.25,awayDuration=3,returnDuration=2.8;
   const returnStart=crossStart+crossDuration+awayDuration,landedAt=returnStart+returnDuration;
   let width=1,height=1,halfW=1,halfH=1,quality=1,elapsed=0,last=0,frame=0;
+  let scrollTarget=0,scrollOffset=0,scrollProgress=0;
   let viewerLocation=null, target=skyState(new Date()), lighting={...target};
   const presets={day:{daylight:1,golden:0},sunset:{daylight:.58,golden:1},night:{daylight:0,golden:0}};
   // Development-only art direction controls; no additional visitor UI.
   const params=process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search) : null;
   let preview=params?.get('sky'), fixedTime=params?.has('sceneTime')?Number(params.get('sceneTime')):null;
   if(presets[preview])lighting={...presets[preview]};
+  const rootElement=document.documentElement;
+  let skyPhase=null;
+  function syncSkyPhase() {
+    const next=lighting.golden>.25 ? 'sunset' : lighting.daylight>.5 ? 'day' : 'night';
+    if(next!==skyPhase) {
+      skyPhase=next;
+      rootElement.dataset.skyPhase=next;
+    }
+  }
+  syncSkyPhase();
+
+  function readScroll() {
+    const maxScroll=Math.max(1,document.documentElement.scrollHeight-innerHeight);
+    scrollProgress=THREE.MathUtils.clamp(scrollY/maxScroll,0,1);
+    // A modest world scale gives the page enough altitude for new cloud banks
+    // while keeping the foreground tree readable before it exits above frame.
+    scrollTarget=scrollProgress*38;
+  }
 
   function resize() {
     width=innerWidth;height=innerHeight;
@@ -92,6 +111,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
     moon.position.set(moonH*camera.aspect*(narrow?.37:.49),moonH*.53,12-moonDepth);
     moon.scale.setScalar(moonH*(narrow?.19:.22));
     travelers.forEach((b,i)=>b.root.scale.setScalar(.4-i*.05));
+    readScroll();
   }
   function onPointer(event) {
     if(!pointerPreference.matches || reduced || event.pointerType==='touch')return;
@@ -101,6 +121,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
   function visibility(){hidden=document.hidden;last=0;}
   function preference(){reduced=motionPreference.matches;if(reduced)resetPointer();}
   window.addEventListener('resize',resize);
+  window.addEventListener('scroll',readScroll,{passive:true});
   window.addEventListener('pointermove',onPointer,{passive:true});
   document.addEventListener('pointerleave',resetPointer);
   document.addEventListener('visibilitychange',visibility);
@@ -125,10 +146,14 @@ export async function startScene(canvas, signal, overlayCanvas) {
     lighting.daylight+=(desired.daylight-lighting.daylight)*blend;
     lighting.golden+=(desired.golden-lighting.golden)*blend;
     const day=lighting.daylight,gold=lighting.golden;
+    syncSkyPhase();
+    scrollOffset+=(scrollTarget-scrollOffset)*(1-Math.exp(-dt*5.5));
     const follow=1-Math.exp(-dt*2.1);
     camera.position.x+=(pointer.x-camera.position.x)*follow;
     camera.position.y+=(pointer.y-camera.position.y)*follow;
     atmosphere.uniforms.cameraOffset.value.set(camera.position.x,camera.position.y);
+    atmosphere.uniforms.scrollOffset.value=scrollOffset;
+    atmosphere.uniforms.scrollProgress.value=scrollProgress;
     atmosphere.uniforms.time.value=motionTime;
     atmosphere.uniforms.daylight.value=day;atmosphere.uniforms.golden.value=gold;
     hemi.intensity=.16+day*1.75;sun.intensity=.08+day*1.65+gold*.8;rim.intensity=.65+gold*1.1;
@@ -138,6 +163,10 @@ export async function startScene(canvas, signal, overlayCanvas) {
     const afterLanding=motionTime-landedAt;
     const impact=!reduced && afterLanding>=0 ? Math.sin(afterLanding*14)*Math.exp(-afterLanding*3)*.009 : 0;
     branch.update(motionTime,impact);
+    const foregroundY=-scrollOffset*1.12;
+    const distantY=-scrollOffset*.56;
+    branch.root.position.y=-(halfH*.62+.69*branch.root.scale.y)+foregroundY;
+    branch.grove.position.y=-(halfH*.58+.62*branch.grove.scale.y)+foregroundY*.86;
     branch.root.updateMatrixWorld(true);branch.perch.getWorldPosition(landingPoint);
     const edge=(z,side)=>side*(halfW*(camera.position.z-z)/12+bird.root.scale.x*2);
     const followPath=(path,progress,brake)=>{
@@ -177,10 +206,10 @@ export async function startScene(canvas, signal, overlayCanvas) {
     } else if(t<crossStart+crossDuration) {
       bird.root.visible=true;
       followPath(new THREE.CubicBezierCurve3(
-        new THREE.Vector3(edge(-5.6,-1),halfH*.52,-5.6),
-        new THREE.Vector3(-halfW*.22,halfH*.5,-6.2),
-        new THREE.Vector3(halfW*.22,halfH*.52,-6),
-        new THREE.Vector3(edge(-5.4,1),halfH*.54,-5.4),
+        new THREE.Vector3(edge(-5.6,-1),halfH*.52+foregroundY,-5.6),
+        new THREE.Vector3(-halfW*.22,halfH*.5+foregroundY,-6.2),
+        new THREE.Vector3(halfW*.22,halfH*.52+foregroundY,-6),
+        new THREE.Vector3(edge(-5.4,1),halfH*.54+foregroundY,-5.4),
       ),(t-crossStart)/crossDuration,0);
       bird.root.userData.state='flying';
     } else if(t<returnStart) {
@@ -190,15 +219,15 @@ export async function startScene(canvas, signal, overlayCanvas) {
       const progress=(t-returnStart)/returnDuration;
       const brake=THREE.MathUtils.smoothstep(progress,.48,.98);
       followPath(new THREE.CubicBezierCurve3(
-        new THREE.Vector3(edge(2.2,1),halfH*.18,2.2),
-        new THREE.Vector3(halfW*.58,halfH*.22,1.15),
+        new THREE.Vector3(edge(2.2,1),halfH*.18+foregroundY,2.2),
+        new THREE.Vector3(halfW*.58,halfH*.22+foregroundY,1.15),
         landingPoint.clone().add(new THREE.Vector3(1.35,.72,.18)),landingPoint,
       ),progress,brake);
       bird.root.userData.state=progress>.7?'landing':'flying';
     }
     travelers.forEach((b,i)=>{
       const far=i/3,phase=t*(.28-far*.06)+i*1.85,speed=.58+i*.1;
-      b.root.position.set(halfW*(.22+i*.52)-t*speed,halfH*(.5+i*.08)+t*.025+.1*Math.sin(phase),-5.4-i*2.2+.22*Math.sin(phase*.5));
+      b.root.position.set(halfW*(.22+i*.52)-t*speed,halfH*(.5+i*.08)+t*.025+.1*Math.sin(phase)+distantY,-5.4-i*2.2+.22*Math.sin(phase*.5));
       const viewHalfWidth=halfW*(camera.position.z-b.root.position.z)/12;
       const exitMargin=Math.max(viewHalfWidth*.12,b.root.scale.x*2);
       b.root.visible=!reduced && b.root.position.x>camera.position.x-viewHalfWidth-exitMargin;
@@ -230,12 +259,12 @@ export async function startScene(canvas, signal, overlayCanvas) {
   if(process.env.NODE_ENV === 'development')window.__sky={
     createBird,
     setMode(mode){preview=mode;},setTime(time){fixedTime=time;},
-    state(){return {elapsed,bird:bird.root.userData.state,rig:bird.rigInfo,travelers:travelers.map(b=>({visible:b.root.visible,ndcX:b.root.position.clone().project(camera).x})),daylight:lighting.daylight,golden:lighting.golden,locationSource:viewerLocation?'ip':'clock',quality,reduced,drawCalls:renderer.info.render.calls};},
+    state(){return {elapsed,bird:bird.root.userData.state,rig:bird.rigInfo,travelers:travelers.map(b=>({visible:b.root.visible,ndcX:b.root.position.clone().project(camera).x})),daylight:lighting.daylight,golden:lighting.golden,scrollProgress,worldOffset:scrollOffset,cloudOffset:atmosphere.uniforms.scrollOffset.value,locationSource:viewerLocation?'ip':'clock',quality,reduced,drawCalls:renderer.info.render.calls};},
   };
   return function dispose() {
     if (disposed) return;
     disposed=true;cancelAnimationFrame(frame);clearInterval(refreshTimer);
-    window.removeEventListener('resize',resize);window.removeEventListener('pointermove',onPointer);
+    window.removeEventListener('resize',resize);window.removeEventListener('scroll',readScroll);window.removeEventListener('pointermove',onPointer);
     document.removeEventListener('pointerleave',resetPointer);document.removeEventListener('visibilitychange',visibility);
     motionPreference.removeEventListener('change',preference);
     bird.dispose();travelers.forEach(b=>b.dispose());branch.dispose?.();
@@ -251,6 +280,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
     geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());
     atmosphere.dispose();soft.dispose();flockSoft.dispose();blur.dispose();composer.dispose();renderer.dispose();
     delete canvas.dataset.ready;
+    if(rootElement.dataset.skyPhase===skyPhase)delete rootElement.dataset.skyPhase;
     if(process.env.NODE_ENV === 'development')delete window.__sky;
   };
 }
