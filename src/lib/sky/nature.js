@@ -399,11 +399,11 @@ export function createMoon(map) {
         // Project the existing lunar photograph onto the visible hemisphere.
         vec3 surface=texture2D(map,n.xy*.485+.5).rgb;
         float night=1.-daylight;
-        vec3 lifted=mix(surface,vec3(1.),.62*night);
+        vec3 lifted=mix(surface,vec3(1.),.24*night);
         vec3 tint=mix(vec3(.92,.96,1.),vec3(.86,.89,.94),daylight);
         vec3 color=tint*lifted*(.65+phase*.65);
         float rim=pow(1.-limb,1.35);
-        color+=tint*night*rim*.85;
+        color+=tint*night*rim*1.35;
         float alpha=phase*(limb*mix(.92,.38,daylight)+night*rim*.5);
         gl_FragColor=vec4(color,alpha);
       }`,
