@@ -201,8 +201,41 @@ function addLeafCluster(transforms, origin, growthDir, count, scaleBase, isHero,
   }
 }
 
+function curveFrom(points) {
+  return new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
+}
+
+function nearestOnCurve(curve, point, samples = 96) {
+  let bestT = 0, bestD = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const d = curve.getPointAt(t).distanceToSquared(point);
+    if (d < bestD) { bestD = d; bestT = t; }
+  }
+  return { t: bestT, point: curve.getPointAt(bestT) };
+}
+
+function attachSpec(parentCurve, spec) {
+  const start = new THREE.Vector3(...spec[0]);
+  const hit = nearestOnCurve(parentCurve, start);
+  const dx = hit.point.x - start.x, dy = hit.point.y - start.y, dz = hit.point.z - start.z;
+  const attached = spec.map(p => [p[0] + dx, p[1] + dy, p[2] + dz]);
+  const intoT = Math.max(0, hit.t - 0.035);
+  const into = parentCurve.getPointAt(intoT);
+  const mesh = into.distanceToSquared(hit.point) > 1e-6 ? [into.toArray(), ...attached] : attached;
+  return { spec: attached, mesh };
+}
+
+function mixPoint(from, toward, amount) {
+  return [
+    from[0] + (toward[0] - from[0]) * amount,
+    from[1] + (toward[1] - from[1]) * amount,
+    from[2] + (toward[2] - from[2]) * amount,
+  ];
+}
+
 function taperedBranch(points, radius, material) {
-  const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
+  const curve = curveFrom(points);
   const geometry = new THREE.TubeGeometry(curve, 32, radius, 9, false);
   const positions = geometry.attributes.position;
   for (let i = 0; i <= 32; i++) {
@@ -216,13 +249,16 @@ function taperedBranch(points, radius, material) {
   return new THREE.Mesh(geometry, material);
 }
 
-function addTwigs(parent, specs, bark, leafMaterial, leafGeometry, twigs, isHero) {
-  for (const spec of specs) {
+function addTwigs(parent, parentPoints, specs, bark, leafMaterial, leafGeometry, twigs, isHero) {
+  const parentCurve = curveFrom(parentPoints);
+  for (const raw of specs) {
+    const { spec, mesh } = attachSpec(parentCurve, raw);
     const pivot = new THREE.Group();
     pivot.position.set(...spec[0]);
     parent.add(pivot);
     const local = spec.map(p => p.map((v, i) => v - spec[0][i]));
-    pivot.add(taperedBranch(local, .042, bark));
+    const localMesh = mesh.map(p => p.map((v, i) => v - spec[0][i]));
+    pivot.add(taperedBranch(localMesh, .042, bark));
     twigs.push(pivot);
 
     const leafTransforms = [];
@@ -243,10 +279,10 @@ function addTwigs(parent, specs, bark, leafMaterial, leafGeometry, twigs, isHero
       const lateralDir = new THREE.Vector3(stemDir.y * 0.6, -stemDir.x * 0.6, stemDir.z + 0.4).normalize();
       addLeafCluster(leafTransforms, midStem, lateralDir, 5, isHero ? 0.14 : 0.10, isHero, spec[0]);
 
-      // Sub-twig 1
+      // Sub-twig 1 — start inside the parent stem so the join cannot float.
       const p1 = [p[0] - .22, p[1] + .18, p[2]];
       const p2 = [p[0] - .39, p[1] + .42, p[2] + .05];
-      pivot.add(taperedBranch([p, p1, p2], .012, bark));
+      pivot.add(taperedBranch([mixPoint(p, pPrev, 0.28), p, p1, p2], .012, bark));
 
       const tip = new THREE.Vector3(...p2);
       const mid = new THREE.Vector3(...p1);
@@ -260,15 +296,16 @@ function addTwigs(parent, specs, bark, leafMaterial, leafGeometry, twigs, isHero
 
       // Secondary twiglet off tip
       const p3 = [p2[0] - .14, p2[1] + .16, p2[2] + .03];
-      pivot.add(taperedBranch([p2, p3], .008, bark));
+      pivot.add(taperedBranch([mixPoint(p2, p1, 0.28), p2, p3], .008, bark));
       const tip3 = new THREE.Vector3(...p3);
       const subDir3 = tip3.clone().sub(tip).normalize();
       addLeafCluster(leafTransforms, tip3, subDir3, 6, isHero ? 0.15 : 0.11, isHero, spec[0]);
 
       // Complementary sub-twig on opposite side (for every node)
-      const altTip = i % 2 === 1 ? [p[0] + .22, p[1] + .24, p[2] - .06] : [p[0] - .08, p[1] + .24, p[2] + .16];
+      // Complementary sub-twig on the opposite fork, still along the tree's leftward reach.
+      const altTip = i % 2 === 1 ? [p[0] - .12, p[1] + .24, p[2] - .16] : [p[0] - .08, p[1] + .24, p[2] + .16];
       const altMid = [p[0] + (altTip[0] - p[0]) * 0.5, p[1] + (altTip[1] - p[1]) * 0.5, p[2] + (altTip[2] - p[2]) * 0.5];
-      pivot.add(taperedBranch([p, altMid, altTip], .010, bark));
+      pivot.add(taperedBranch([mixPoint(p, pPrev, 0.28), p, altMid, altTip], .010, bark));
       const altTipV = new THREE.Vector3(...altTip);
       const altMidV = new THREE.Vector3(...altMid);
       const altDir = altTipV.clone().sub(new THREE.Vector3(...p)).normalize();
@@ -310,27 +347,23 @@ export function createBranch() {
   });
   const leafGeometry = createLeafGeometry();
 
-  sway.add(taperedBranch([[3, -2.6, 1.6], [1.6, -.9, .6], [.5, .23, .1], [-.8, .62, 0], [-2.6, .97, -.3]], .135, bark));
+  const trunk = [[3, -2.6, 1.6], [1.6, -.9, .6], [.5, .23, .1], [-.8, .62, 0], [-2.6, .97, -.3]];
+  sway.add(taperedBranch(trunk, .135, bark));
   const twigs = [];
-  addTwigs(sway, [
+  addTwigs(sway, trunk, [
     [[1.3, -.6, .5], [1.55, .5, .7], [1.28, 1.7, .85], [1.55, 2.1, .8]],
     [[.3, .3, .1], [-.05, 1.13, .05], [-.48, 1.83, -.2], [-.25, 2.18, -.2]],
     [[-.85, .65, 0], [-1.7, .1, .3], [-2.55, .22, .3]],
     [[2, -1.4, 1.], [.3, -1.1, 2.2], [-1.2, -.42, 3.3], [-2.1, .2, 3.8]],
-    [[2, -1.3, 1.], [2.9, .0, 2.7], [3.2, 1.7, 3.5]],
     [[1.1, -1.1, .8], [-.4, -.55, 1.4], [-1.8, .05, 1.9], [-3.1, .35, 2.1]],
     [[.6, -.2, .2], [-.9, .15, .55], [-2.2, .55, .7], [-3.4, .85, .5]],
     [[1.8, -1.8, 1.2], [.2, -1.55, 2.4], [-1.6, -.9, 3.1], [-2.8, -.2, 3.4]],
-  ], bark, leafMaterial, leafGeometry, twigs, true);
-
-  groveSway.add(taperedBranch([[2.4, -2.8, 1.2], [1.1, -1.1, .5], [-.4, .15, .15], [-2.2, .7, -.15], [-3.6, 1.15, -.35]], .12, bark));
-  addTwigs(groveSway, [
     [[1.6, -1.2, .6], [.2, -.4, 1.1], [-1.5, .2, 1.5], [-2.8, .65, 1.6]],
     [[.4, -.2, .2], [-.8, .45, .4], [-2.1, .9, .35], [-3.3, 1.25, .2]],
     [[-.6, .35, .1], [-1.8, .15, .55], [-3.1, .45, .7]],
     [[1.2, -1.7, .9], [-.3, -1.2, 2.], [-1.9, -.5, 2.7], [-3., .15, 2.9]],
     [[.1, .2, .05], [-1.1, .7, .15], [-2.4, 1.15, 0], [-3.5, 1.5, -.15]],
-  ], bark, leafMaterial, leafGeometry, twigs, false);
+  ], bark, leafMaterial, leafGeometry, twigs, true);
 
   const perch = new THREE.Object3D(); perch.position.set(-.93, .69, 0); sway.add(perch);
 

@@ -149,8 +149,10 @@ export async function startScene(canvas, signal, overlayCanvas) {
     syncSkyPhase();
     scrollOffset+=(scrollTarget-scrollOffset)*(1-Math.exp(-dt*5.5));
     const follow=1-Math.exp(-dt*2.1);
-    camera.position.x+=(pointer.x-camera.position.x)*follow;
-    camera.position.y+=(pointer.y-camera.position.y)*follow;
+    const idleX=reduced?0:.02*Math.sin(elapsed*.29)+.009*Math.sin(elapsed*.67+1.1);
+    const idleY=reduced?0:.014*Math.sin(elapsed*.23+.6)+.007*Math.sin(elapsed*.51+1.7);
+    camera.position.x+=(pointer.x+idleX-camera.position.x)*follow;
+    camera.position.y+=(pointer.y+idleY-camera.position.y)*follow;
     atmosphere.uniforms.cameraOffset.value.set(camera.position.x,camera.position.y);
     atmosphere.uniforms.scrollOffset.value=scrollOffset;
     atmosphere.uniforms.scrollProgress.value=scrollProgress;

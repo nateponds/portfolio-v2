@@ -251,16 +251,6 @@ function Hero() {
           </a>
         </div>
       </div>
-      <div className="hero-symbols" aria-hidden="true">
-        <span className="ps-sym sym-t">△</span>
-        <span className="ps-sym sym-o">○</span>
-        <span className="ps-sym sym-x">✕</span>
-        <span className="ps-sym sym-s">□</span>
-      </div>
-      <div className="hero-scroll" aria-hidden="true">
-        <div className="scroll-line" />
-        <span>Scroll</span>
-      </div>
     </section>
   );
 }
