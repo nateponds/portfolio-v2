@@ -32,7 +32,10 @@ jobs:
         run: |
           set -euo pipefail
           candidate=/mnt/Storage2_New/website-hosting/nateponds-portfolio/ops/apache/nateponds-portfolio.conf
-          install -m 0644 ops/apache/nateponds-portfolio.conf "${candidate}"
+          # The mounted storage accepts content writes but rejects the runner's
+          # chmod attempt; preserve the candidate's existing metadata.
+          umask 022
+          cat ops/apache/nateponds-portfolio.conf >"${candidate}"
           sudo /usr/local/sbin/deploy-nateponds-apache
 
       - name: Verify Apache origin
