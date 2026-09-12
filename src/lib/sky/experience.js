@@ -44,12 +44,15 @@ export async function startScene(canvas, signal, overlayCanvas) {
   const bird=createBird();
   const travelers=[createBird(),createBird(),createBird(),createBird()];
   const foliage=new THREE.Group();
-  foliage.add(branch.root,branch.grove,bird.root,...travelers.map(b=>b.root));
+  foliage.add(branch.root,branch.grove,bird.root);
+  const flock=new THREE.Group();
+  flock.add(...travelers.map(b=>b.root));
   if(overlayCanvas) {
     overlayCanvas.hidden=true;
   }
   const lights=[hemi,sun,rim];
   const soft=createForeground(renderer,camera,foliage,lights);
+  const flockSoft=createForeground(renderer,camera,flock,lights,.5);
   const composer=new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene,camera));
   const blur=new BokehPass(scene,camera,{focus:14.5,aperture:.00255,maxblur:.0102});
@@ -57,6 +60,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
   blur.materialBokeh.fragmentShader=blur.materialBokeh.fragmentShader.replace('float factor = ( focus + viewZ );','float factor = max(0.0, focus + viewZ);');
   composer.addPass(blur);
   composer.addPass(soft.pass);
+  composer.addPass(flockSoft.pass);
   composer.addPass(new OutputPass());
   const pointer=new THREE.Vector2(), landingPoint=new THREE.Vector3();
   const perchFacing=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI);
@@ -76,7 +80,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
     camera.aspect=width/height;camera.updateProjectionMatrix();
     halfH=Math.tan(THREE.MathUtils.degToRad(21))*12;halfW=halfH*camera.aspect;
     renderer.setSize(width,height,false);
-    composer.setSize(width,height);atmosphere.resize(width,height,quality);soft.resize(width,height);
+    composer.setSize(width,height);atmosphere.resize(width,height,quality);soft.resize(width,height);flockSoft.resize(width,height);
     const narrow=width<700;
     branch.root.scale.set(narrow?.9:1.5,narrow?.72:1,1);
     branch.root.position.set(halfW*(narrow?.46:.48)+.93*branch.root.scale.x,-halfH*.62-.69*branch.root.scale.y,0);
@@ -207,7 +211,7 @@ export async function startScene(canvas, signal, overlayCanvas) {
       b.pose(motionTime*.45+i*1.7,1,0,dt,reduced,{glide,bank:.05*Math.sin(phase*.5),cadence});
     });
     renderer.info.reset();
-    atmosphere.render();soft.render(false);composer.render();
+    atmosphere.render();soft.render(false);flockSoft.render(false);composer.render();
     if(canvas.dataset.ready!=='true')last=performance.now();
     canvas.dataset.ready='true';
     // One conservative quality adjustment based on sustained visible frame time.
@@ -238,13 +242,14 @@ export async function startScene(canvas, signal, overlayCanvas) {
     const geometries=new Set(),materials=new Set(),textures=new Set();
     scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     soft.scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
+    flockSoft.scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     materials.forEach(material=>{
       for(const value of Object.values(material))if(value?.isTexture)textures.add(value);
       for(const uniform of Object.values(material.uniforms||{}))if(uniform.value?.isTexture)textures.add(uniform.value);
       material.dispose();
     });
     geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());
-    atmosphere.dispose();soft.dispose();blur.dispose();composer.dispose();renderer.dispose();
+    atmosphere.dispose();soft.dispose();flockSoft.dispose();blur.dispose();composer.dispose();renderer.dispose();
     delete canvas.dataset.ready;
     if(process.env.NODE_ENV === 'development')delete window.__sky;
   };

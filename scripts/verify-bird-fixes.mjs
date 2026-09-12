@@ -12,17 +12,17 @@ try {
     const head=bird.root.getObjectByName('head');
     const random=Math.random;Math.random=()=>.75;
     try {
-      bird.pose(12,0,0,1/60,true);
-      const base=head.quaternion.clone();let maximum=0;
+      bird.pose(12,0,0,1/60,false,{lookTime:9.9});
+      const expected=head.quaternion.clone();let maximum=0;
       for(let i=0;i<400;i++) {
-        bird.pose(12,0,0,1/60,false);
-        maximum=Math.max(maximum,base.angleTo(head.quaternion));
+        bird.pose(12,0,0,1/60,false,{lookTime:9.9});
+        maximum=Math.max(maximum,expected.angleTo(head.quaternion));
       }
       bird.dispose();return maximum;
     } finally {Math.random=random;}
   });
   console.log('Maximum head offset (radians):',headDrift);
-  assert.ok(headDrift<.4,'Head offset accumulates across repeated animation frames');
+  assert.ok(headDrift<1e-6,'Head offset accumulates across repeated animation frames');
   const motion=await page.evaluate(()=>{
     const bird=window.__sky.createBird(),head=bird.root.getObjectByName('head');
     const left=bird.root.getObjectByName('Foot_L'),right=bird.root.getObjectByName('Foot_R');
@@ -55,6 +55,25 @@ try {
   });
   assert.ok(rigStability.drift<1e-6,'Rig offsets accumulate on repeated frames');
   assert.ok(rigStability.seek<1e-6,'Rig offsets depend on seek history');
+  const lookRange=await page.evaluate(()=>{
+    const bird=window.__sky.createBird(),head=bird.root.getObjectByName('head');
+    const poses={};
+    for(const [name,lookTime] of Object.entries({neutral:16.5,left:1.8,up:3.4,right:5,down:6.6})) {
+      // Keep mixer time fixed so these angles measure only the procedural look layer.
+      bird.pose(12,0,1,1/60,false,{lookTime});
+      poses[name]=head.quaternion.clone();
+    }
+    const angle=(a,b)=>poses[a].angleTo(poses[b]);
+    const result={
+      leftRight:angle('left','right'),upDown:angle('up','down'),
+      maximum:Math.max(...['left','right','up','down'].map(name=>angle('neutral',name))),
+    };
+    bird.dispose();return result;
+  });
+  console.log('Perched look range (radians):',lookRange);
+  assert.ok(lookRange.leftRight>.9,'Left and right looks are not clearly separated');
+  assert.ok(lookRange.upDown>.5,'Up and down looks are not clearly separated');
+  assert.ok(lookRange.maximum<.8,'Perched head rotation exceeds the safe maximum');
   assert.ok(new Set(motion.samples.map(s=>s.head.join(','))).size>5,'Perched head should inspect different directions');
   for(const sample of motion.samples) {
     assert.ok(Math.hypot(...sample.foot.map((v,i)=>v-motion.samples[0].foot[i]))<1e-5,'Perch anchor slides during idle');
@@ -69,5 +88,5 @@ try {
       if(time===70)assert.ok(birds.every(b=>!b.visible),'Birds should finish exiting');
     }
   }
-  console.log('PASS: bounded varied head looks, deterministic seeking, still reduced motion, stable foot midpoint; full offscreen exits at mobile, desktop and wide sizes.');
+  console.log('PASS: pronounced bounded head looks, deterministic seeking, still reduced motion, stable foot midpoint; full offscreen exits at mobile, desktop and wide sizes.');
 } finally {await browser.close();}

@@ -55,12 +55,13 @@ export async function loadBirds() {
     const restAnchor=new THREE.Vector3();
     footL.getWorldPosition(restAnchor);footR.getWorldPosition(other);
     restAnchor.add(other).multiplyScalar(.5);model.worldToLocal(restAnchor);
-    // Fixed, irregular observation bouts: quick turns, long holds, occasional tilts.
+    // Fixed, irregular observation bouts: clear turns, long holds, occasional tilts.
     // Absolute time makes head movement identical during replay and preview seeking.
     const looks=[
-      [0,0,0,0],[1.8,.32,-.06,.03],[3.1,.12,.13,-.08],
-      [5.7,-.34,.03,0],[6.6,-.21,-.12,.09],[9.4,0,.06,0],
-      [12.2,.27,.1,-.06],[14.1,-.12,0,0],[16.5,0,0,0],[17,0,0,0],
+      [0,0,0,0],[1.4,.61,-.04,.03],[3,.2,.24,-.1],
+      [4.6,-.58,.02,0],[6.2,-.35,-.22,.1],[8,.08,.12,0],
+      [9.5,.68,.05,-.07],[11.3,-.64,.1,.05],[13,-.18,-.18,-.1],
+      [14.8,.38,.18,.06],[16,0,0,0],[17,0,0,0],
     ];
     return {root,
       rigInfo:{bones:mesh.skeleton.bones.length,clips:asset.animations.map(a=>a.name),controls:controlledNames},
@@ -102,15 +103,15 @@ export async function loadBirds() {
           let index=0;
           while(index<looks.length-2 && lookTime>=looks[index+1][0])index++;
           const current=looks[index],previous=looks[Math.max(0,index-1)];
-          const turn=THREE.MathUtils.smootherstep(lookTime-current[0],0,.19);
+          const turn=THREE.MathUtils.smootherstep(lookTime-current[0],0,.26);
           const attention=(1-weight)*THREE.MathUtils.smoothstep(options.lookTime??time,0,.8);
           const pitch=THREE.MathUtils.lerp(previous[2],current[2],turn)*attention;
           const yaw=THREE.MathUtils.lerp(previous[1],current[1],turn)*attention;
           const tilt=THREE.MathUtils.lerp(previous[3],current[3],turn)*attention;
           headOffset.setFromEuler(new THREE.Euler(pitch,tilt,yaw));
           head.quaternion.multiply(headOffset);
-          // Neck follows a little; the head performs most of the quick observation.
-          offset('spine_3',pitch*.18,tilt*.12,yaw*.2);
+          // The upper spine follows enough to keep the wider scan readable.
+          offset('spine_3',pitch*.25,tilt*.18,yaw*.3);
         }
         controls.forEach(({bone})=>bone.quaternion.normalize());
         // Anchor the authored feet at the branch, not the model's origin.

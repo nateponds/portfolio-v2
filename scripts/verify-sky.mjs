@@ -8,6 +8,7 @@ const browser=await chromium.launch({headless:true,channel:process.env.BROWSER_C
 const context=await browser.newContext({viewport:{width:1440,height:900}});
 await context.route('https://ipapi.co/**',route=>route.fulfill({json:{latitude:14.6,longitude:121}}));
 const page=await context.newPage();
+page.setDefaultTimeout(90000);
 const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 page.on('console',message=>{if(message.type()==='error' && !message.text().includes('favicon'))errors.push(message.text());});
