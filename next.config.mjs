@@ -19,7 +19,9 @@ const contentSecurityPolicy = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Vercel sets VERCEL=1 and does not use standalone output. Leaving it on
+  // with Vercel's Next.js adapter can fail looking for next-server.js.nft.json.
+  output: process.env.VERCEL ? undefined : 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
   ...(deploymentId ? { deploymentId } : {}),
