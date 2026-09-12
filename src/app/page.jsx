@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { SkyBackground } from '@/components/sky-background';
 import {
   initialProjects,
@@ -219,36 +220,166 @@ function Reveal({ as: Element = 'div', className = '', delay = 0, children, ...p
   );
 }
 
+const SCRAMBLE_POOL = {
+  upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  lower: 'abcdefghijklmnopqrstuvwxyz',
+};
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function randomGlyph(target) {
+  const pool = target === target.toUpperCase() ? SCRAMBLE_POOL.upper : SCRAMBLE_POOL.lower;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function ScrambleText({ text, active = true, interval = 42, onDone }) {
+  const [output, setOutput] = useState('');
+  const done = useRef(false);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    done.current = false;
+    if (!active) {
+      setOutput('');
+      return undefined;
+    }
+    if (prefersReducedMotion()) {
+      setOutput(text);
+      onDoneRef.current?.();
+      return undefined;
+    }
+
+    const chars = Array.from(text);
+    let locked = 0;
+
+    const skipNonLetters = () => {
+      while (locked < chars.length && !/\p{L}/u.test(chars[locked])) locked += 1;
+    };
+
+    const paint = () => {
+      if (locked >= chars.length) {
+        setOutput(text);
+        return;
+      }
+      setOutput(chars.slice(0, locked).join('') + randomGlyph(chars[locked]));
+    };
+
+    const finish = () => {
+      setOutput(text);
+      if (!done.current) {
+        done.current = true;
+        onDoneRef.current?.();
+      }
+    };
+
+    skipNonLetters();
+    paint();
+
+    const timer = window.setInterval(() => {
+      locked += 1;
+      skipNonLetters();
+      if (locked >= chars.length) {
+        window.clearInterval(timer);
+        finish();
+        return;
+      }
+      paint();
+    }, interval);
+
+    return () => window.clearInterval(timer);
+  }, [active, interval, text]);
+
+  return output;
+}
+
 function Hero() {
+  const [stage, setStage] = useState('name');
+  const [buttonsIn, setButtonsIn] = useState(false);
+  const finishCopy = useRef(0);
+
+  useEffect(() => {
+    if (prefersReducedMotion()) {
+      setStage('copy');
+      setButtonsIn(true);
+    }
+  }, []);
+
+  const onNameDone = () => setStage((current) => (current === 'name' ? 'copy' : current));
+  const onCopyDone = () => {
+    finishCopy.current += 1;
+    if (finishCopy.current >= 5) setButtonsIn(true);
+  };
+
   return (
     <section id="hero" className="hero-section" aria-labelledby="hero-name">
-      <div className="hero-content">
+      <div className="hero-content" data-hero-stage={stage}>
         <p className="hero-eyebrow">
-          {site.heroEyebrow} <span>{site.heroEyebrowSuffix}</span>
+          <ScrambleText text={site.heroEyebrow} active={stage === 'copy'} onDone={onCopyDone} />
+          {stage === 'copy' ? ' ' : null}
+          <span>
+            <ScrambleText
+              text={site.heroEyebrowSuffix}
+              active={stage === 'copy'}
+              interval={36}
+              onDone={onCopyDone}
+            />
+          </span>
         </p>
-        <h1 id="hero-name">{site.heading}</h1>
+        <h1 id="hero-name" aria-label={site.heading}>
+          <ScrambleText text={site.heading} interval={48} onDone={onNameDone} />
+        </h1>
         <p className="hero-role">
-          <strong>SysAdmin &amp; DevSecOps</strong> · Computer Science
+          <strong>
+            <ScrambleText
+              text="SysAdmin & DevSecOps"
+              active={stage === 'copy'}
+              interval={34}
+              onDone={onCopyDone}
+            />
+          </strong>
+          {stage === 'copy' ? <span className="hero-role-sep"> · </span> : null}
+          <ScrambleText
+            text="Computer Science"
+            active={stage === 'copy'}
+            interval={34}
+            onDone={onCopyDone}
+          />
         </p>
-        <p className="hero-tagline">{site.description}</p>
-        <div className="hero-buttons">
-          <a href="#projects" className="hero-btn btn-primary">
-            <GridIcon />
-            Projects
-          </a>
-          <a
-            href={site.githubRepository}
-            className="hero-btn btn-secondary"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <GitHubIcon size={14} />
-            View my code on GitHub
-          </a>
-          <a href="#contact" className="hero-btn btn-secondary">
-            <MailIcon size={14} />
-            Contact Me
-          </a>
+        <p className="hero-tagline">
+          <ScrambleText
+            text={site.description}
+            active={stage === 'copy'}
+            interval={18}
+            onDone={onCopyDone}
+          />
+        </p>
+        <div className={`hero-buttons${buttonsIn ? ' is-in' : ''}`}>
+          <span className="hero-btn-rise" style={{ '--hero-rise-delay': '0ms' }}>
+            <a href="#projects" className="hero-btn btn-primary">
+              <GridIcon />
+              Projects
+            </a>
+          </span>
+          <span className="hero-btn-rise" style={{ '--hero-rise-delay': '90ms' }}>
+            <a
+              href={site.githubRepository}
+              className="hero-btn btn-secondary"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <GitHubIcon size={14} />
+              View my code on GitHub
+            </a>
+          </span>
+          <span className="hero-btn-rise" style={{ '--hero-rise-delay': '180ms' }}>
+            <a href="#contact" className="hero-btn btn-secondary">
+              <MailIcon size={14} />
+              Contact Me
+            </a>
+          </span>
         </div>
       </div>
     </section>
@@ -481,10 +612,14 @@ function ProjectCard({ project }) {
   return (
     <Reveal as="article" className="project-row" delay={160}>
       <div className="project-visual has-image">
-        <img
+        <Image
           src={project.image}
           alt={project.imageAlt || `${project.name} project preview`}
           loading="lazy"
+          decoding="async"
+          width={project.imageWidth || 1600}
+          height={project.imageHeight || 960}
+          sizes="(max-width: 760px) 100vw, 60vw"
         />
       </div>
       <div className="project-card">
