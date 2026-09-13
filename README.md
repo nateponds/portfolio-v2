@@ -17,12 +17,24 @@ On Windows PowerShell with script execution disabled, use `npm.cmd` and `npx.cmd
 src/
   app/
     layout.jsx          Shared HTML shell, metadata, global CSS import
-    page.jsx            Homepage markup; start here for new sections
+    page.jsx            Homepage composition only (server component)
     globals.css         Site styles and responsive rules
   components/
+    about.jsx           About section (server; nests Terminal)
+    contact.jsx         Contact footer (server)
+    hero.jsx            Hero section and rise wrappers (server)
+    icons.jsx           Shared SVG icons (server)
+    navigation.jsx      Header nav; client for menu and scroll state
+    project-card.jsx    Featured project row
+    projects.jsx        Projects section; client for live status fetch
+    reveal.jsx          Intersection reveal wrapper (client)
     sky-background.jsx  Client component; mounts and cleans up Three.js
+    stack-carousel.jsx  Technology stack strip (server)
+    terminal.jsx        About terminal typewriter (client)
   content/
     site.js             Editable text and site metadata
+  hooks/
+    use-projects.js     Live project status polling (client)
   lib/sky/
     experience.js       Scene composition, animation loop, lifecycle
     atmosphere.js       Volumetric clouds, sky colors, stars
@@ -43,7 +55,7 @@ raw/                   Original asset sources, not served by Next.js
 
 ### Add a section to the homepage
 
-Edit `src/app/page.jsx`. Put new content inside `<main>` and adjust `#content` in `globals.css` from its centered hero layout when adding multiple sections. The sky stays fixed behind the page. Normal scrolling and interactive links are enabled.
+Add a focused file under `src/components/` and compose it from `src/app/page.jsx`. Put new content inside `<main>` and adjust `#content` in `globals.css` from its centered hero layout when adding multiple sections. The sky stays fixed behind the page. Normal scrolling and interactive links are enabled. Add `'use client'` only when the new section needs state, effects, or browser APIs.
 
 ### Add an About page
 
