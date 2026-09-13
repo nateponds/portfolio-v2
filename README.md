@@ -17,12 +17,23 @@ On Windows PowerShell with script execution disabled, use `npm.cmd` and `npx.cmd
 src/
   app/
     layout.jsx          Shared HTML shell, metadata, global CSS import
-    page.jsx            Homepage markup; start here for new sections
+    page.jsx            Homepage composition; import new sections here
     globals.css         Site styles and responsive rules
   components/
+    about.jsx           About copy, focus cards, terminal, and stack
+    contact.jsx         Footer and contact methods
+    hero.jsx            Hero heading and primary actions
+    icons.jsx           Shared SVG icons
+    navigation.jsx      Client nav, mobile menu, scroll state
+    projects.jsx        Featured project list and status polling
+    reveal.jsx          Intersection-based reveal animation
     sky-background.jsx  Client component; mounts and cleans up Three.js
+    stack-carousel.jsx  Technology marquee
+    terminal.jsx        Typed “current focus” terminal
   content/
     site.js             Editable text and site metadata
+  hooks/
+    use-projects.js     Client hook for live project status
   lib/sky/
     experience.js       Scene composition, animation loop, lifecycle
     atmosphere.js       Volumetric clouds, sky colors, stars
@@ -43,7 +54,7 @@ raw/                   Original asset sources, not served by Next.js
 
 ### Add a section to the homepage
 
-Edit `src/app/page.jsx`. Put new content inside `<main>` and adjust `#content` in `globals.css` from its centered hero layout when adding multiple sections. The sky stays fixed behind the page. Normal scrolling and interactive links are enabled.
+Create a component in `src/components/` and compose it from `src/app/page.jsx` inside `<main>`. Add `'use client';` only when the section needs state, effects, or browser APIs. Adjust `#content` in `globals.css` from its centered hero layout when adding multiple sections. The sky stays fixed behind the page. Normal scrolling and interactive links are enabled.
 
 ### Add an About page
 
