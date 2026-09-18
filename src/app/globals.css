@@ -28,6 +28,10 @@ html {
   background: var(--mist);
 }
 
+html:has(.boot-veil:not(.is-gone)) {
+  overflow: hidden;
+}
+
 body {
   min-width: 320px;
   min-height: 100%;
@@ -57,6 +61,68 @@ img { max-width: 100%; }
 #content { position: relative; z-index: 3; min-height: 100svh; }
 #sky[hidden], #sky-bird[hidden] { display: none; }
 
+.boot-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, var(--sky) 0%, var(--mist) 56%, var(--paper) 100%);
+  color: var(--ink);
+  transition: opacity 700ms ease, visibility 700ms ease;
+}
+
+.boot-veil.is-gone,
+html[data-app-ready] .boot-veil {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.boot-veil-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.15rem;
+}
+
+.boot-veil-mark {
+  display: block;
+  width: 3rem;
+  height: 3rem;
+  object-fit: contain;
+  animation: boot-breathe 1.8s ease-in-out infinite alternate;
+}
+
+.boot-veil-line {
+  display: block;
+  width: 2.6rem;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.35;
+  transform-origin: center;
+  animation: boot-line 2.1s ease-in-out infinite;
+}
+
+.boot-veil-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@keyframes boot-breathe {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+@keyframes boot-line {
+  0%, 100% { transform: scaleX(0.4); opacity: 0.18; }
+  50% { transform: scaleX(1); opacity: 0.5; }
+}
+
 .site-nav {
   position: absolute;
   z-index: 6;
@@ -67,6 +133,12 @@ img { max-width: 100%; }
   gap: 2rem;
   padding: 1.1rem clamp(1.15rem, 4vw, 3.8rem);
   color: var(--ink);
+  opacity: 0;
+  transition: opacity 800ms ease;
+}
+
+html[data-app-ready] .site-nav {
+  opacity: 1;
 }
 
 .site-logo {
@@ -197,6 +269,10 @@ html[data-sky-phase="night"] .site-nav.menu-open .nav-toggle { border-color: var
 
 .hero-rise-inner {
   display: block;
+  opacity: 0;
+}
+
+html[data-app-ready] .hero-rise-inner {
   animation: hero-copy-rise 720ms cubic-bezier(0.16, 1, 0.3, 1) var(--hero-rise-delay, 0ms) both;
 }
 
@@ -216,7 +292,7 @@ html[data-sky-phase="night"] .site-nav.menu-open .nav-toggle { border-color: var
   opacity: 0;
   transform: translateY(1.4rem);
 }
-.hero-buttons.is-in .hero-btn-rise {
+html[data-app-ready] .hero-buttons.is-in .hero-btn-rise {
   animation: hero-btn-rise 720ms cubic-bezier(0.16, 1, 0.3, 1) var(--hero-rise-delay, 0ms) forwards;
 }
 
@@ -368,6 +444,6 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--sun); outline-o
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
   .reveal { opacity: 1; transform: none; }
   .hero-content h1, .hero-content p { text-shadow: none; }
-  .hero-rise-inner, .hero-btn-rise { opacity: 1; transform: none; animation: none; }
+  .hero-rise-inner, .hero-btn-rise, .site-nav, .boot-veil-mark, .boot-veil-line { opacity: 1; transform: none; animation: none; }
   .stack-track { animation: none; }
 }

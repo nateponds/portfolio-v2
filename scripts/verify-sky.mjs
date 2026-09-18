@@ -18,10 +18,19 @@ page.setDefaultTimeout(90000);
 const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 page.on('console',message=>{if(message.type()==='error' && !message.text().includes('favicon'))errors.push(message.text());});
+async function waitForScene() {
+  await page.waitForSelector('canvas[data-ready="true"]',{timeout:60000});
+  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+  await page.waitForFunction(()=>{
+    const veil=document.querySelector('.boot-veil');
+    return veil && veil.classList.contains('is-gone') && getComputedStyle(veil).visibility==='hidden';
+  });
+}
+
 await mkdir('artifacts/sky',{recursive:true});
 for(const mode of ['day','sunset','night']) {
   await page.goto(`${baseURL}/?sky=${mode}&sceneTime=12`);
-  await page.waitForSelector('canvas[data-ready="true"]',{timeout:60000});
+  await waitForScene();
   await page.waitForFunction(expected=>document.documentElement.dataset.skyPhase===expected,mode);
   await page.screenshot({path:`artifacts/sky/${mode}.png`});
   const phaseCheck=await page.evaluate(()=>({
@@ -47,7 +56,7 @@ for(const mode of ['day','sunset','night']) {
   assert.ok(rig.clips.includes('Flap') && rig.clips.includes('Idle'));
 }
 await page.goto(`${baseURL}/?sky=day&sceneTime=0`);
-await page.waitForSelector('canvas[data-ready="true"]');
+await waitForScene();
 for(const [time,state] of [[2.99,'waiting'],[3.01,'flying'],[3.7,'flying'],[4.4,'away'],[5.8,'away'],[7.5,'flying'],[9.5,'landing'],[11,'perched'],[40,'perched']]) {
   await page.evaluate(t=>window.__sky.setTime(t),time);
   await page.waitForFunction(expected=>window.__sky.state().bird===expected,state);
@@ -56,7 +65,7 @@ for(const [time,state] of [[2.99,'waiting'],[3.01,'flying'],[3.7,'flying'],[4.4,
 }
 await page.setViewportSize({width:390,height:844});
 await page.goto(`${baseURL}/?sky=day&sceneTime=12`);
-await page.waitForSelector('canvas[data-ready="true"]');
+await waitForScene();
 await page.screenshot({path:'artifacts/sky/mobile.png'});
 assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
 
@@ -65,7 +74,7 @@ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerW
 // easy to inspect in review.
 await page.setViewportSize({width:1440,height:900});
 await page.goto(`${baseURL}/?sky=day&sceneTime=12`);
-await page.waitForSelector('canvas[data-ready="true"]');
+await waitForScene();
 const scrollMax=await page.evaluate(()=>document.documentElement.scrollHeight-innerHeight);
 const capture=async(path,position)=>{
   await page.evaluate(y=>window.scrollTo(0,y),position);
@@ -91,7 +100,7 @@ assert.ok(contact.worldOffset-first.worldOffset>20,'Scroll should cover meaningf
 
 await page.setViewportSize({width:390,height:844});
 await page.goto(`${baseURL}/?sky=day&sceneTime=12`);
-await page.waitForSelector('canvas[data-ready="true"]');
+await waitForScene();
 await page.screenshot({path:'artifacts/landscape-mobile-hero.png'});
 assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
 await capture('landscape-mobile-about.png',await elementTop('.about-copy'));
@@ -99,13 +108,13 @@ await capture('landscape-mobile-projects.png',await sectionTop('projects'));
 await capture('landscape-mobile-contact.png',await sectionTop('contact'));
 await page.emulateMedia({reducedMotion:'reduce'});
 await page.goto(`${baseURL}/?sky=day&sceneTime=0`);
-await page.waitForSelector('canvas[data-ready="true"]');
+await waitForScene();
 assert.equal(await page.evaluate(()=>window.__sky.state().bird),'perched');
 await context.unroute('https://ipapi.co/**');
 await context.route('https://ipapi.co/**',route=>route.abort());
 await page.evaluate(()=>sessionStorage.clear());
 await page.goto(`${baseURL}/?sky=day`);
-await page.waitForSelector('canvas[data-ready="true"]');
+await waitForScene();
 assert.equal(await page.evaluate(()=>window.__sky.state().locationSource),'clock');
 const manila={latitude:14.6,longitude:121};
 assert.ok(solarAltitude(new Date('2026-09-11T04:00:00Z'),14.6,121)>70);

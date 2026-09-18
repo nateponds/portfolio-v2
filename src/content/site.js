@@ -108,7 +108,7 @@ export const site = {
       number: '04',
       name: 'Piecework',
       description:
-        'A browser jigsaw, built with Swashua, that turns any PNG, JPEG, or WebP into an aspect-aware puzzle with optional timed challenges, piece trays, and custom sorting buckets.',
+        'A browser jigsaw, built with Joshua Faber, that turns any PNG, JPEG, or WebP into an aspect-aware puzzle with optional timed challenges, piece trays, and custom sorting buckets.',
       stacks: ['React', 'CSS', 'JavaScript', 'Vite'],
       status: 'green',
       url: 'https://piecework.nateponds.com',

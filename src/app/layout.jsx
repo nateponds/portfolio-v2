@@ -13,7 +13,12 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <noscript>
+          <style>{`.boot-veil{display:none!important}html{overflow:auto!important}.hero-rise-inner,.hero-btn-rise,.site-nav{opacity:1!important;transform:none!important;animation:none!important}`}</style>
+        </noscript>
+        {children}
+      </body>
     </html>
   );
 }

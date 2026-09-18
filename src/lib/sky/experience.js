@@ -9,7 +9,7 @@ import { loadBirds } from './birds.js';
 import { approximateLocation, skyState } from './daylight.js';
 import { createForeground } from './foreground.js';
 
-export async function startScene(canvas, signal, overlayCanvas) {
+export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
   // Load before allocating a renderer so an abandoned React mount cannot
   // create a second WebGL context on the same canvas.
   const loader=new THREE.TextureLoader();
@@ -243,8 +243,11 @@ export async function startScene(canvas, signal, overlayCanvas) {
     });
     renderer.info.reset();
     atmosphere.render();soft.render(false);flockSoft.render(false);composer.render();
-    if(canvas.dataset.ready!=='true')last=performance.now();
-    canvas.dataset.ready='true';
+    if(canvas.dataset.ready!=='true') {
+      last=performance.now();
+      canvas.dataset.ready='true';
+      if(!disposed && !signal?.aborted) onFirstFrame?.();
+    }
     // One conservative quality adjustment based on sustained visible frame time.
     if(!qualityChecked && t>2 && rawDt>0) {
       totalFrameTime+=rawDt;samples++;
