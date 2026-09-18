@@ -8,7 +8,7 @@ export const site = {
   heading: 'Nathaniel Ryan Ponce',
   role: 'SysAdmin & DevSecOps · Computer Science',
   description:
-    'Building resilient systems and clean software — from bare-metal servers to full-stack web. Currently studying at USC while keeping the infrastructure running and the servers humming.',
+    'Building resilient systems and clean software, from bare-metal servers to full-stack web. Currently studying at USC while keeping the infrastructure running and the servers humming.',
   heroEyebrow: 'USC CS Student & Sysadmin',
   heroEyebrowSuffix: 'Served from Ubuntu LTS',
   githubRepository: 'https://github.com/nateponds/nateponds.com',
@@ -92,20 +92,6 @@ export const site = {
     },
     {
       number: '03',
-      name: 'Aqualine',
-      description:
-        'A custom logistics and inventory database system developed by Joannah Bael and Nathaniel Ponce for Aqualine, a water refilling station, to streamline tracking and daily operations.',
-      stacks: ['HTML', 'CSS', 'JS', 'PHP', 'MySQL'],
-      status: 'green',
-      url: 'https://aqualine.nateponds.com',
-      featured: true,
-      image: '/assets/portfolio/showcases/aqualine-showcase.webp',
-      imageAlt: 'Aqualine water delivery system shown across desktop, tablet, and mobile screens',
-      imageWidth: 1600,
-      imageHeight: 960,
-    },
-    {
-      number: '04',
       name: 'Linko',
       description:
         'A planned supplier-matching platform for MSMEs and wholesale providers, designed to improve supplier discovery, client acquisition, and supply-chain coordination for growing businesses.',
