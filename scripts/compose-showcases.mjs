@@ -14,7 +14,7 @@ const devices = [
   { key: 'mobile', className: 'device--phone' },
 ];
 
-const projectSlugs = ['darius', 'swappr', 'aqualine', 'linko'];
+const projectSlugs = ['darius', 'swappr', 'aqualine', 'linko', 'piecework'];
 const requestedSlugs = process.argv.slice(2).filter(Boolean);
 const slugs = requestedSlugs.length > 0 ? requestedSlugs : projectSlugs;
 
