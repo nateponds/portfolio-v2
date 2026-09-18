@@ -4,7 +4,7 @@ const deploymentId = process.env.DEPLOYMENT_VERSION;
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
-  "connect-src 'self' https://ipapi.co",
+  "connect-src 'self' https://ipapi.co https://nateponds-project-status.nathanielryanponce.workers.dev",
   "font-src 'self'",
   "form-action 'none'",
   "frame-ancestors 'none'",
