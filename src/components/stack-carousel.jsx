@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { site, technologies } from '@/content/site';
 
 export function StackCarousel() {
@@ -12,10 +13,12 @@ export function StackCarousel() {
         <div className="stack-track">
           {items.map((stack, index) => (
             <article className="stack-item" key={`${stack.name}-${index}`}>
-              <img
+              <Image
                 src={stack.icon}
                 alt={`${stack.name} logo`}
-                loading="lazy"
+                width={32}
+                height={32}
+                unoptimized={stack.icon.endsWith('.svg')}
                 className={stack.inverted ? 'stack-icon-inverted' : ''}
               />
               <span>{stack.name}</span>

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 
 export function Navigation() {
@@ -34,7 +35,7 @@ export function Navigation() {
       aria-label="Primary navigation"
     >
       <a className="site-logo" href="#hero" aria-label="Nathaniel Ponce Home">
-        <img src="/assets/portfolio/logo.png" alt="Nathaniel Ponce Logo" />
+        <Image src="/assets/portfolio/logo.png" alt="Nathaniel Ponce Logo" width={43} height={43} priority />
       </a>
       <button
         className="nav-toggle"

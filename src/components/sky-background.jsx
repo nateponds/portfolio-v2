@@ -8,8 +8,11 @@ export function SkyBackground({ onReady, onError }) {
   const overlayRef = useRef(null);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
-  onReadyRef.current = onReady;
-  onErrorRef.current = onError;
+
+  useEffect(() => {
+    onReadyRef.current = onReady;
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     const controller = new AbortController();

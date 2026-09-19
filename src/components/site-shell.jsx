@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { SkyBackground } from '@/components/sky-background';
 
@@ -50,7 +51,7 @@ export function SiteShell({ children }) {
       >
         <p className="boot-veil-label">Preparing the sky</p>
         <div className="boot-veil-inner">
-          <img className="boot-veil-mark" src="/assets/portfolio/logo.png" alt="" />
+          <Image className="boot-veil-mark" src="/assets/portfolio/logo.png" alt="" width={48} height={48} priority />
           <span className="boot-veil-line" />
         </div>
       </div>
