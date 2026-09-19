@@ -11,7 +11,7 @@ export const site = {
     'Building resilient systems and clean software, from bare-metal servers to full-stack web. Currently studying at USC while keeping the infrastructure running and the servers humming.',
   heroEyebrow: 'USC CS Student & Sysadmin',
   heroEyebrowSuffix: 'Served from Ubuntu LTS',
-  githubRepository: 'https://github.com/nateponds/nateponds.com',
+  githubRepository: 'https://github.com/nateponds/portfolio-v2',
   githubProfile: 'https://github.com/nateponds',
   linkedin: 'https://www.linkedin.com/',
   email: 'nathanielryanponce@gmail.com',
