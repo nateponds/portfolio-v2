@@ -208,10 +208,10 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
     } else if(t<crossStart+crossDuration) {
       bird.root.visible=true;
       followPath(new THREE.CubicBezierCurve3(
-        new THREE.Vector3(edge(-5.6,-1),halfH*.52+foregroundY,-5.6),
-        new THREE.Vector3(-halfW*.22,halfH*.5+foregroundY,-6.2),
-        new THREE.Vector3(halfW*.22,halfH*.52+foregroundY,-6),
-        new THREE.Vector3(edge(-5.4,1),halfH*.54+foregroundY,-5.4),
+        new THREE.Vector3(edge(-5.6,-1),halfH*.24+foregroundY,-5.6),
+        new THREE.Vector3(-halfW*.22,halfH*.22+foregroundY,-6.2),
+        new THREE.Vector3(halfW*.22,halfH*.24+foregroundY,-6),
+        new THREE.Vector3(edge(-5.4,1),halfH*.26+foregroundY,-5.4),
       ),(t-crossStart)/crossDuration,0);
       bird.root.userData.state='flying';
     } else if(t<returnStart) {
