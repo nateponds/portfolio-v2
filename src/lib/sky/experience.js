@@ -153,10 +153,10 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
     const idleY=reduced?0:.014*Math.sin(elapsed*.23+.6)+.007*Math.sin(elapsed*.51+1.7);
     camera.position.x+=(pointer.x+idleX-camera.position.x)*follow;
     camera.position.y+=(pointer.y+idleY-camera.position.y)*follow;
-    atmosphere.uniforms.cameraOffset.value.set(camera.position.x,camera.position.y);
+    atmosphere.uniforms.cameraOffset.value.set(0,0);
     atmosphere.uniforms.scrollOffset.value=scrollOffset;
     atmosphere.uniforms.scrollProgress.value=scrollProgress;
-    atmosphere.uniforms.time.value=motionTime;
+    atmosphere.uniforms.time.value=0;
     atmosphere.uniforms.daylight.value=day;atmosphere.uniforms.golden.value=gold;
     hemi.intensity=.16+day*1.75;sun.intensity=.08+day*1.65+gold*.8;rim.intensity=.65+gold*1.1;
     sun.color.set('#fff1d8').lerp(new THREE.Color('#ffb469'),gold);
@@ -264,7 +264,7 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
   if(process.env.NODE_ENV === 'development')window.__sky={
     createBird,
     setMode(mode){preview=mode;},setTime(time){fixedTime=time;},
-    state(){return {elapsed,bird:bird.root.userData.state,rig:bird.rigInfo,travelers:travelers.map(b=>({visible:b.root.visible,ndcX:b.root.position.clone().project(camera).x})),daylight:lighting.daylight,golden:lighting.golden,scrollProgress,worldOffset:scrollOffset,cloudOffset:atmosphere.uniforms.scrollOffset.value,locationSource:viewerLocation?'ip':'clock',quality,reduced,drawCalls:renderer.info.render.calls};},
+    state(){return {elapsed,bird:bird.root.userData.state,rig:bird.rigInfo,travelers:travelers.map(b=>({visible:b.root.visible,ndcX:b.root.position.clone().project(camera).x})),daylight:lighting.daylight,golden:lighting.golden,scrollProgress,worldOffset:scrollOffset,cloudOffset:atmosphere.uniforms.scrollOffset.value,locationSource:viewerLocation?'ip':'clock',quality,reduced,staticClouds:true,atmosphereDraws:atmosphere.draws,drawCalls:renderer.info.render.calls};},
   };
   return function dispose() {
     if (disposed) return;

@@ -118,15 +118,37 @@ export function createAtmosphere(renderer, mobile) {
   scene.add(quad);
   const camera = new THREE.Camera();
   const target = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false });
+  // Every device reuses the last frame until scroll, light, or size changes.
+  // Wind and pointer parallax are not part of this key; the caller freezes them.
+  const SCROLL_STEP = 0.35;
+  const LIGHT_STEP = 0.02;
+  let cachedKey = null;
+  let draws = 0;
+  function invalidate() { cachedKey = null; }
   return {
     texture: target.texture, uniforms,
+    get draws() { return draws; },
     resize(width, height, quality = 1) {
       const scale = (mobile ? .48 : .65) * quality;
       target.setSize(Math.round(width*scale), Math.round(height*scale));
       uniforms.aspect.value = width/height;
       uniforms.resolution.value.set(target.width,target.height);
+      invalidate();
     },
-    render() { renderer.setRenderTarget(target); renderer.render(scene,camera); renderer.setRenderTarget(null); },
+    invalidate,
+    render() {
+      const scroll = Math.round(uniforms.scrollOffset.value / SCROLL_STEP);
+      const day = Math.round(uniforms.daylight.value / LIGHT_STEP);
+      const gold = Math.round(uniforms.golden.value / LIGHT_STEP);
+      const key = `${scroll}:${day}:${gold}:${target.width}:${target.height}`;
+      if (key === cachedKey) return;
+      cachedKey = key;
+      uniforms.scrollOffset.value = scroll * SCROLL_STEP;
+      uniforms.daylight.value = day * LIGHT_STEP;
+      uniforms.golden.value = gold * LIGHT_STEP;
+      draws += 1;
+      renderer.setRenderTarget(target); renderer.render(scene,camera); renderer.setRenderTarget(null);
+    },
     dispose() { noise.dispose(); material.dispose(); quad.geometry.dispose(); target.dispose(); },
   };
 }
