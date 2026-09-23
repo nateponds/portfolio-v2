@@ -1,5 +1,6 @@
 import { site } from '@/content/site';
 import { GitHubIcon, GridIcon, MailIcon } from '@/components/icons';
+import { SkyModePicker } from '@/components/sky-mode-picker';
 
 function Rise({ delay, className = '', children }) {
   return (
@@ -59,6 +60,7 @@ export function Hero() {
           </span>
         </div>
       </div>
+      <SkyModePicker />
     </section>
   );
 }

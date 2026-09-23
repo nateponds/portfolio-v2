@@ -8,6 +8,7 @@ import { createBranch, createMoon } from './nature.js';
 import { loadBirds } from './birds.js';
 import { approximateLocation, skyState } from './daylight.js';
 import { createForeground } from './foreground.js';
+import { getSkyMode, setSkyMode, subscribeSkyMode } from './mode.js';
 
 export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
   // Load before allocating a renderer so an abandoned React mount cannot
@@ -71,12 +72,21 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
   let scrollTarget=0,scrollOffset=0,scrollProgress=0;
   let viewerLocation=null, target=skyState(new Date()), lighting={...target};
   const presets={day:{daylight:1,golden:0},sunset:{daylight:.58,golden:1},night:{daylight:0,golden:0}};
-  // Development-only art direction controls; no additional visitor UI.
   const params=process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search) : null;
-  let preview=params?.get('sky'), fixedTime=params?.has('sceneTime')?Number(params.get('sceneTime')):null;
+  let preview=getSkyMode()||params?.get('sky'), fixedTime=params?.has('sceneTime')?Number(params.get('sceneTime')):null;
+  if(!presets[preview])preview=null;
   if(presets[preview])lighting={...presets[preview]};
+  const stopMode=subscribeSkyMode((mode)=>{preview=presets[mode]?mode:null;});
   const rootElement=document.documentElement;
   let skyPhase=null;
+  let textLight=-1;
+  function syncTextContrast() {
+    const next=Math.round(THREE.MathUtils.smoothstep(1-lighting.daylight,.35,.9)*100);
+    if(next!==textLight) {
+      textLight=next;
+      rootElement.style.setProperty('--sky-text-light',`${next}%`);
+    }
+  }
   function syncSkyPhase() {
     const next=lighting.golden>.25 ? 'sunset' : lighting.daylight>.5 ? 'day' : 'night';
     if(next!==skyPhase) {
@@ -85,6 +95,7 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
     }
   }
   syncSkyPhase();
+  syncTextContrast();
 
   function readScroll() {
     const maxScroll=Math.max(1,document.documentElement.scrollHeight-innerHeight);
@@ -142,11 +153,13 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
     const t=fixedTime!==null && Number.isFinite(fixedTime)?fixedTime:elapsed;
     const motionTime=reduced?0:t;
     const desired=presets[preview]||target;
-    const blend=1-Math.exp(-dt*.4);
+    const blendRate=preview?1.2:.4;
+    const blend=1-Math.exp(-dt*blendRate);
     lighting.daylight+=(desired.daylight-lighting.daylight)*blend;
     lighting.golden+=(desired.golden-lighting.golden)*blend;
     const day=lighting.daylight,gold=lighting.golden;
     syncSkyPhase();
+    syncTextContrast();
     scrollOffset+=(scrollTarget-scrollOffset)*(1-Math.exp(-dt*5.5));
     const follow=1-Math.exp(-dt*2.1);
     const idleX=reduced?0:.02*Math.sin(elapsed*.29)+.009*Math.sin(elapsed*.67+1.1);
@@ -263,7 +276,7 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
   frame=requestAnimationFrame(tick);
   if(process.env.NODE_ENV === 'development')window.__sky={
     createBird,
-    setMode(mode){preview=mode;},setTime(time){fixedTime=time;},
+    setMode(mode){setSkyMode(presets[mode]?mode:null);},setTime(time){fixedTime=time;},
     state(){return {elapsed,bird:bird.root.userData.state,rig:bird.rigInfo,travelers:travelers.map(b=>({visible:b.root.visible,ndcX:b.root.position.clone().project(camera).x})),daylight:lighting.daylight,golden:lighting.golden,scrollProgress,worldOffset:scrollOffset,cloudOffset:atmosphere.uniforms.scrollOffset.value,locationSource:viewerLocation?'ip':'clock',quality,reduced,staticClouds:true,atmosphereDraws:atmosphere.draws,drawCalls:renderer.info.render.calls};},
   };
   return function dispose() {
@@ -285,7 +298,9 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
     geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());
     atmosphere.dispose();soft.dispose();flockSoft.dispose();blur.dispose();composer.dispose();renderer.dispose();
     delete canvas.dataset.ready;
+    stopMode();
     if(rootElement.dataset.skyPhase===skyPhase)delete rootElement.dataset.skyPhase;
+    rootElement.style.removeProperty('--sky-text-light');
     if(process.env.NODE_ENV === 'development')delete window.__sky;
   };
 }

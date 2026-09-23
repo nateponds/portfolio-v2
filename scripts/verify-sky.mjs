@@ -39,17 +39,14 @@ for(const mode of ['day','sunset','night']) {
     heading:getComputedStyle(document.querySelector('.hero-content h1')).color,
     nav:getComputedStyle(document.querySelector('.nav-button')).color,
     secondary:getComputedStyle(document.querySelector('.hero-btn.btn-secondary')).color,
+    textLight:parseFloat(document.documentElement.style.getPropertyValue('--sky-text-light')),
   }));
   assert.equal(phaseCheck.phase,mode);
-  if(mode==='night') {
-    assert.equal(phaseCheck.heading,'rgb(244, 247, 247)');
-    assert.equal(phaseCheck.nav,'rgb(244, 247, 247)');
-    assert.equal(phaseCheck.secondary,'rgb(244, 247, 247)');
-  } else {
-    assert.equal(phaseCheck.heading,'rgb(36, 59, 64)');
-    assert.equal(phaseCheck.nav,'rgb(36, 59, 64)');
-    assert.equal(phaseCheck.secondary,'rgb(36, 59, 64)');
-  }
+  assert.equal(phaseCheck.nav,phaseCheck.heading);
+  assert.equal(phaseCheck.secondary,phaseCheck.heading);
+  if(mode==='day')assert.equal(phaseCheck.textLight,0);
+  if(mode==='sunset')assert.ok(phaseCheck.textLight<10);
+  if(mode==='night')assert.equal(phaseCheck.textLight,100);
   console.log(mode,phaseCheck);
   const rig=await page.evaluate(()=>window.__sky.state().rig);
   assert.equal(rig.bones,55);

@@ -11,11 +11,13 @@ export default function HomePage() {
       <Navigation />
       <div id="content">
         <Hero />
-        <main>
-          <About />
-          <Projects />
-        </main>
-        <Contact />
+        <div className="lower-page">
+          <main>
+            <About />
+            <Projects />
+          </main>
+          <Contact />
+        </div>
       </div>
     </SiteShell>
   );
