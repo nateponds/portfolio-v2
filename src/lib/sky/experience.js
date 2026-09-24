@@ -172,7 +172,7 @@ export async function startScene(canvas, signal, overlayCanvas, onFirstFrame) {
     atmosphere.uniforms.time.value=0;
     atmosphere.uniforms.daylight.value=day;atmosphere.uniforms.golden.value=gold;
     hemi.intensity=.16+day*1.75;sun.intensity=.08+day*1.65+gold*.8;rim.intensity=.65+gold*1.1;
-    sun.color.set('#fff1d8').lerp(new THREE.Color('#ffb469'),gold);
+    sun.color.set('#fff1d8').lerp(new THREE.Color('#ff7e38'),gold);
     hemi.color.set('#829cc9').lerp(new THREE.Color('#e5edff'),day);
     moon.material.uniforms.daylight.value=day;
     const afterLanding=motionTime-landedAt;

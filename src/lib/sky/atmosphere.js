@@ -78,8 +78,8 @@ export function createAtmosphere(renderer, mobile) {
         vec3 mist = mix(vec3(.66,.79,.83),vec3(.84,.90,.90),uv.y);
         vec3 nightMist = mix(vec3(.06,.09,.16),vec3(.015,.03,.08),uv.y);
         sky = mix(sky,mix(nightMist,mist,daylight),descent*.32);
-        vec3 sunset = mix(vec3(1.,.78,.43),vec3(.95,.43,.58),smoothstep(0.,.52,uv.y));
-        sunset = mix(sunset,vec3(.38,.25,.55),smoothstep(.42,1.,uv.y));
+        vec3 sunset = mix(vec3(1.,.52,.16),vec3(.88,.32,.26),smoothstep(0.,.52,uv.y));
+        sunset = mix(sunset,vec3(.34,.16,.48),smoothstep(.42,1.,uv.y));
         sky = mix(sky,sunset,golden*.96);
         vec2 starGrid = floor(uv*vec2(aspect,1.)*470.);
         vec2 starUV = fract(uv*vec2(aspect,1.)*470.)-.5;
@@ -101,8 +101,8 @@ export function createAtmosphere(renderer, mobile) {
             float lighting = exp(-shade*2.5);
             vec3 shadowColor = mix(vec3(.025,.045,.08),vec3(.42,.54,.59),daylight);
             vec3 litColor = mix(vec3(.09,.14,.22),vec3(.97,.95,.88),daylight);
-            litColor = mix(litColor,vec3(1.,.69,.55),golden*.95);
-            shadowColor = mix(shadowColor,vec3(.48,.25,.39),golden*.7);
+            litColor = mix(litColor,vec3(1.,.50,.26),golden*.95);
+            shadowColor = mix(shadowColor,vec3(.42,.18,.16),golden*.7);
             vec3 cloud = mix(shadowColor,litColor,lighting);
             float alpha = 1.-exp(-d*stride*1.9);
             color += transmittance*alpha*cloud;
